@@ -94,26 +94,38 @@ layerWidget layerId note = el "div" $ do
 numberInput :: (MonadHold t m, MonadFix m, DomBuilder t m, Show a, Read a, Num a, Eq a)
             => a -> (a -> Bool) -> m (Dynamic t a)
 numberInput startingValue validator = do
-  input <- inputElement $
-    def & inputElementConfig_initialValue .~ showText startingValue
-        & inputElementConfig_elementConfig
-            %~ elementConfig_initialAttributes
-                 .~ "type" =: "number"
+  rec
+    input <- inputElement $
+      def & inputElementConfig_initialValue .~ showText startingValue
+          & inputElementConfig_setValue .~ setValEv
 
-  let element = _inputElement_element input
-      validate v _ = do
-        n <- readMaybe $ T.unpack v
-        guard $ validator n
-        pure n
+    let element = _inputElement_element input
+        validate v _ = do
+          n <- readMaybe $ T.unpack v
+          guard $ validator n
+          pure n
 
-      blurEvent     = () <$ domEvent Blur element
-      enterKeyEvent = () <$ (ffilter (== 13) $ domEvent Keypress element)
+        blurEvent     = domEvent Blur element
+        keyDownEv     = domEvent Keydown element
+        upArrowEv     = 1 <$ ffilter (== 38) keyDownEv
+        downArrowEv   = (-1) <$ ffilter (== 40) keyDownEv
+        enterKeyEvent = () <$ ffilter (== 13) keyDownEv
 
-  valDyn <- foldDynMaybe validate startingValue
-          . tagPromptlyDyn (_inputElement_value input)
-          $ leftmost [blurEvent, enterKeyEvent]
+        setVal cur delta
+          | validator new = Just $ showText new
+          | otherwise = Nothing
+          where new = cur + delta
+        setValEv = fmapMaybe id $ setVal <$> current valDyn
+                                         <@> leftmost [upArrowEv, downArrowEv]
+        changeValueEv =
+          leftmost [ tagPromptlyDyn (_inputElement_value input)
+                                    (leftmost [blurEvent, enterKeyEvent])
+                   , setValEv
+                   ]
 
-  -- TODO indicate if text is invalid
+    valDyn <- foldDynMaybe validate startingValue changeValueEv
+
+    -- TODO indicate if text is invalid
   holdUniqDyn valDyn
 
 toggleButton :: (DomBuilder t m, PostBuild t m)
