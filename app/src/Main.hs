@@ -7,6 +7,7 @@ import           Control.Lens
 import           Control.Monad (guard)
 import           Control.Monad.Fix (MonadFix)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
+import qualified Data.ByteString as BS
 import qualified Data.Text as T
 import qualified Data.Map as M
 import           Reflex
@@ -21,12 +22,13 @@ main = do
   -- - MVar with the volume
   -- will supply them to the network via ReaderT
 
-  mainWidget $ el "div" $ do
+  css <- BS.readFile "../css/styles.css"
+  mainWidgetWithCss css $ el "div" $ do
     rec
       newLayerIdDyn <- count newLayerEv
       randomNoteEv <- performEvent $ generateRandomNote <$ newLayerEv
       -- TODO need to perform layer adding and removing IO actions
-      newLayerNoteDyn <- accum (const id) Note randomNoteEv
+      newLayerNoteDyn <- accum (const id) (Note "A4") randomNoteEv
       let newLayerEventDyn = NewLayer <$> newLayerIdDyn <*> newLayerNoteDyn
           layerEvents = leftmost [updated newLayerEventDyn, deleteLayerEvents]
 
@@ -68,65 +70,93 @@ main = do
 
     pure ()
 
-layerWidget :: (DomBuilder t m, PerformEvent t m, MonadIO (Performable m))
+layerWidget :: (MonadHold t m, MonadFix m, DomBuilder t m, PerformEvent t m, MonadIO (Performable m))
             => Int -> Note -> m (Event t LayerEvent)
 layerWidget layerId note = el "div" $ do
   el "div" . text $ "Layer " <> showText layerId
 
-  beatCodeInput <- inputElement $
-    def & inputElementConfig_initialValue .~ "1"
+  beatCodeInput <- textFieldInput "1" (BeatCode "1") (Just . BeatCode) (const never)
 
   let beatCodeEv = fmap (updateLayerBeatCode layerId)
-                 . updated $ _inputElement_value beatCodeInput
+                 $ updated beatCodeInput
   performEvent_ beatCodeEv
 
-  noteInput <- inputElement $
-    def & inputElementConfig_initialValue .~ showText note
+  noteInput <- textFieldInput "A4" (Note "A4") (Just . Note) (const never)
 
   let noteEv = fmap (updateLayerNote layerId)
-             . updated $ _inputElement_value noteInput
+             $ updated noteInput
   performEvent_ noteEv
 
   deleteEv <- button "X"
 
   pure $ RemoveLayer layerId <$ deleteEv
 
+-- | an input field that only updates its value on blur or pressing enter, and
+-- only if the text contents are successfully validated.
+textFieldInput :: (MonadHold t m, MonadFix m, DomBuilder t m, Eq a)
+               => T.Text
+               -> a
+               -> (T.Text -> Maybe a)
+               -> (Event t Word -> Event t T.Text)
+               -> m (Dynamic t a)
+textFieldInput initialText initialValue validator mkSetValEv = do
+  rec
+    input <- inputElement $
+      def & inputElementConfig_initialValue .~ initialText
+          & inputElementConfig_setValue .~ setValEv
+          & inputElementConfig_elementConfig
+              %~ elementConfig_modifyAttributes .~ attrEv
+
+    let element    = _inputElement_element input
+        keydownEv  = domEvent Keydown element
+        keypressEv = domEvent Keypress element
+        setValEv   = mkSetValEv keydownEv
+        editingEv  = ffilter (not . flip elem [37, 38, 39, 40]) keydownEv
+        blurEv     = domEvent Blur element
+        enterKeyEv = () <$ ffilter (== 13) keypressEv
+        valueEv    = leftmost
+                       [ setValEv
+                       , tagPromptlyDyn
+                           (_inputElement_value input)
+                           $ leftmost [ blurEv
+                                      , enterKeyEv
+                                      ]
+                       ]
+
+    mbValDyn <- foldDyn (const . validator) (Just initialValue) valueEv
+
+    let invalidAttrs  = "class" =: Just "invalid-field"
+        editingAttrs  = "class" =: Just "edited-field"
+        validAttrs    = "class" =: Nothing
+        invalidAttrEv = ffor (updated mbValDyn) $ maybe invalidAttrs
+                                                        (const validAttrs)
+        editingAttrEv = editingAttrs <$ editingEv
+        attrEv        = leftmost [invalidAttrEv, editingAttrEv]
+    valDyn <- foldDynMaybe const initialValue $ updated mbValDyn
+  holdUniqDyn valDyn
+
 numberInput :: (MonadHold t m, MonadFix m, DomBuilder t m, Show a, Read a, Num a, Eq a)
             => a -> (a -> Bool) -> m (Dynamic t a)
 numberInput startingValue validator = do
   rec
-    input <- inputElement $
-      def & inputElementConfig_initialValue .~ showText startingValue
-          & inputElementConfig_setValue .~ setValEv
-
-    let element = _inputElement_element input
-        validate v _ = do
+    let validate v = do
           n <- readMaybe $ T.unpack v
           guard $ validator n
           pure n
+        s ev =
+          let upArrowEv   = 1 <$ ffilter (== 38) ev
+              downArrowEv = (-1) <$ ffilter (== 40) ev
+              setVal cur delta
+                | validator new = Just $ showText new
+                | otherwise = Nothing
+                where new = cur + delta
+              setValEv = fmapMaybe id $ setVal <$> current input
+                                               <@> leftmost [upArrowEv, downArrowEv]
+           in setValEv
 
-        blurEvent     = domEvent Blur element
-        keyDownEv     = domEvent Keydown element
-        upArrowEv     = 1 <$ ffilter (== 38) keyDownEv
-        downArrowEv   = (-1) <$ ffilter (== 40) keyDownEv
-        enterKeyEvent = () <$ ffilter (== 13) keyDownEv
+    input <- textFieldInput (showText startingValue) startingValue validate s
 
-        setVal cur delta
-          | validator new = Just $ showText new
-          | otherwise = Nothing
-          where new = cur + delta
-        setValEv = fmapMaybe id $ setVal <$> current valDyn
-                                         <@> leftmost [upArrowEv, downArrowEv]
-        changeValueEv =
-          leftmost [ tagPromptlyDyn (_inputElement_value input)
-                                    (leftmost [blurEvent, enterKeyEvent])
-                   , setValEv
-                   ]
-
-    valDyn <- foldDynMaybe validate startingValue changeValueEv
-
-    -- TODO indicate if text is invalid
-  holdUniqDyn valDyn
+  pure input
 
 toggleButton :: (DomBuilder t m, PostBuild t m)
              => Dynamic t Bool
@@ -149,18 +179,18 @@ applyLayerEvent :: LayerEvent -> M.Map Int Note -> M.Map Int Note
 applyLayerEvent (NewLayer i note) = M.insert i note
 applyLayerEvent (RemoveLayer i) = M.delete i
 
-updateLayerBeatCode :: MonadIO m => Int -> T.Text -> m ()
+updateLayerBeatCode :: MonadIO m => Int -> BeatCode -> m ()
 updateLayerBeatCode layerId newBeatCode = liftIO $
-  putStrLn $ "Update beatcode of Layer " <> show layerId <> " to " <> T.unpack newBeatCode
+  putStrLn $ "Update beatcode of Layer " <> show layerId <> " to " <> show newBeatCode
 
-updateLayerNote :: MonadIO m => Int -> T.Text -> m ()
+updateLayerNote :: MonadIO m => Int -> Note -> m ()
 updateLayerNote layerId newNote = liftIO $
-  putStrLn $ "Update note of Layer " <> show layerId <> " to " <> T.unpack newNote
+  putStrLn $ "Update note of Layer " <> show layerId <> " to " <> show newNote
 
 generateRandomNote :: MonadIO m => m Note
 generateRandomNote = liftIO $ do
   putStrLn "Generating a random note"
-  pure Note
+  pure (Note "A4")
 
 showText :: Show a => a -> T.Text
 showText = T.pack . show
@@ -171,7 +201,7 @@ data LayerEvent
 
 data Layer = Layer
 
-data Note = Note deriving Show
+newtype Note = Note T.Text deriving (Show, Eq)
 
 data PlaybackState
   = Stopped
@@ -179,3 +209,4 @@ data PlaybackState
   | Paused
   deriving (Show, Eq)
 
+newtype BeatCode = BeatCode T.Text deriving (Show, Eq)

@@ -1,0 +1,12 @@
+input {
+  background-color: black;
+  color: white;
+}
+
+.invalid-field {
+  background-color: #7d0a0a;
+}
+
+.edited-field {
+  background-color: #383838;
+}
