@@ -9,10 +9,13 @@ import           Control.Monad.Fix (MonadFix)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import qualified Data.ByteString as BS
 import qualified Data.Text as T
-import qualified Data.Map as M
+import qualified Data.IntMap as M
 import           Reflex
 import           Reflex.Dom
 import           Text.Read (readMaybe)
+
+import           Jambda.Data
+import           Jambda.Types
 
 main :: IO ()
 main = do
@@ -33,7 +36,7 @@ main = do
           layerEvents = leftmost [updated newLayerEventDyn, deleteLayerEvents]
 
       layerMapDyn <- foldDyn applyLayerEvent mempty layerEvents
-      let layerWidgetsDyn = M.traverseWithKey (\i note -> layerWidget i note)
+      let layerWidgetsDyn = (\m -> M.traverseWithKey (\i note -> layerWidget i note m))
                         <$> layerMapDyn
 
       -- create the layer widgets
@@ -71,10 +74,12 @@ main = do
     pure ()
 
 layerWidget :: (MonadHold t m, MonadFix m, DomBuilder t m, PerformEvent t m, MonadIO (Performable m))
-            => Int -> Note -> m (Event t LayerEvent)
-layerWidget layerId note = el "div" $ do
+            => Int -> Note -> M.IntMap (Note, T.Text) -> m (Event t LayerEvent)
+layerWidget layerId note layerInfo = el "div" $ do
   el "div" . text $ "Layer " <> showText layerId
 
+  let valdiateBeatCode t = do
+        code <- parseBeat
   beatCodeInput <- textFieldInput "1" (BeatCode "1") (Just . BeatCode) (const never)
 
   let beatCodeEv = fmap (updateLayerBeatCode layerId)
@@ -175,9 +180,10 @@ toggleButton enabledDyn label = do
 -- Dynamic since all the effects that will occur on the layer will happen
 -- form within the widget itself?
 
-applyLayerEvent :: LayerEvent -> M.Map Int Note -> M.Map Int Note
-applyLayerEvent (NewLayer i note) = M.insert i note
+applyLayerEvent :: LayerEvent -> M.IntMap (Note, T.Text) -> M.IntMap (Note, T.Text)
+applyLayerEvent (NewLayer i note) = M.insert i (note, "1")
 applyLayerEvent (RemoveLayer i) = M.delete i
+applyLayerEvent (ChangeBeatCode i code) = at i . _Just . _2 .~ code
 
 updateLayerBeatCode :: MonadIO m => Int -> BeatCode -> m ()
 updateLayerBeatCode layerId newBeatCode = liftIO $
@@ -198,6 +204,7 @@ showText = T.pack . show
 data LayerEvent
   = NewLayer Int Note
   | RemoveLayer Int
+  | ChangeBeatCode Int T.Text
 
 data Layer = Layer
 
