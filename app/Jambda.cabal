@@ -17,7 +17,21 @@ cabal-version:       >=1.10
 
 executable Jambda
   main-is:             Main.hs
-  -- other-modules:
+  other-modules: Jambda.Data
+               , Jambda.Data.Audio
+               , Jambda.Data.Constants
+               , Jambda.Data.Conversions
+               , Jambda.Data.Layer
+               , Jambda.Data.Parsers
+               , Jambda.Data.Stream
+               , Jambda.Types
+               , Jambda.Types.Cell
+               , Jambda.Types.JamState
+               , Jambda.Types.Layer
+               , Jambda.Types.Name
+               , Jambda.Types.Newtypes
+               , Jambda.Types.Pitch
+               , Jambda.Types.Semaphore
   -- other-extensions:
   build-depends:       base >=4.11 && <4.12
                      , bytestring
@@ -40,4 +54,5 @@ executable Jambda
                -Wall
                -Wincomplete-uni-patterns
                -Wincomplete-record-updates
+  default-extensions: OverloadedStrings
 

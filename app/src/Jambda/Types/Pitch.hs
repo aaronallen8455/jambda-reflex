@@ -1,14 +1,15 @@
 module Jambda.Types.Pitch
   ( Pitch(..)
   , Note(..)
-  , pitchStr
+  , pitchText
   , pitchToFreq
   ) where
 
-import            Data.Bifunctor
-import            System.Random
+import           Data.Bifunctor
+import qualified Data.Text as T
+import           System.Random
 
-import Jambda.Types.Newtypes (Freq(..), Octave(..))
+import           Jambda.Types.Newtypes (Freq(..), Octave(..))
 
 data Pitch = Pitch Note Octave
   deriving (Eq, Ord)
@@ -35,22 +36,22 @@ data Note
   | AFlat
   deriving (Bounded, Enum, Eq, Ord)
 
-pitchStr :: Pitch -> String
-pitchStr (Pitch n o) = noteStr n ++ show ( getOctave o )
+pitchText :: Pitch -> T.Text
+pitchText (Pitch n o) = noteText n <> T.pack ( show ( getOctave o ) )
 
-noteStr :: Note -> String
-noteStr ANat  = "A"
-noteStr BFlat = "Bb"
-noteStr BNat  = "B"
-noteStr CNat  = "C"
-noteStr DFlat = "Db"
-noteStr DNat  = "D"
-noteStr EFlat = "Eb"
-noteStr ENat  = "E"
-noteStr FNat  = "F"
-noteStr GFlat = "Gb"
-noteStr GNat  = "G"
-noteStr AFlat = "Ab"
+noteText :: Note -> T.Text
+noteText ANat  = "A"
+noteText BFlat = "Bb"
+noteText BNat  = "B"
+noteText CNat  = "C"
+noteText DFlat = "Db"
+noteText DNat  = "D"
+noteText EFlat = "Eb"
+noteText ENat  = "E"
+noteText FNat  = "F"
+noteText GFlat = "Gb"
+noteText GNat  = "G"
+noteText AFlat = "Ab"
 
 pitchToFreq :: Pitch -> Freq
 pitchToFreq ( Pitch note octave ) = Freq $

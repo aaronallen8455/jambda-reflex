@@ -17,7 +17,7 @@ data Cell a =
     { _cellValue  :: !a              -- ^ The rhythmic value of the cell
     , _cellSource :: !(Maybe Pitch)  -- ^ Overrides the sound of the layer
     }
-    deriving Functor
+    deriving (Functor, Eq)
 
 type Cell' = Cell CellValue
 
