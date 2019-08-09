@@ -8,13 +8,14 @@ module Jambda.Types.Newtypes
   , Vol(..)
   , Sec(..)
   , Octave(..)
-  , bpmToString
-  , volToString
+  , bpmToText
+  , volToText
   ) where
 
-import            Foreign.Storable (Storable)
-import            Text.Printf
-import            System.Random (Random)
+import qualified Data.Text as T
+import           Foreign.Storable (Storable)
+import           Text.Printf
+import           System.Random (Random)
 
 newtype Sample = Sample { getSample :: Float } deriving (Show, Eq, Num, Ord, Storable, Enum)
 
@@ -26,13 +27,13 @@ newtype Freq = Freq { getFreq :: Double } deriving (Show, Eq, Ord, Num)
 
 newtype BPM = BPM { getBPM :: Double } deriving (Show, Eq, Ord, Num, Enum, Fractional)
 
-bpmToString :: BPM -> String
-bpmToString (BPM x) = printf "%.1f" x
+bpmToText :: BPM -> T.Text
+bpmToText (BPM x) = T.pack $ printf "%.1f" x
 
 newtype Vol = Vol { getVol :: Float } deriving (Show, Eq, Ord, Num, Fractional)
 
-volToString :: Vol -> String
-volToString (Vol x) = printf "%.1f" x
+volToText :: Vol -> T.Text
+volToText (Vol x) = T.pack $ printf "%.1f" x
 
 newtype Sec = Sec { getSec :: Double } deriving (Show, Eq, Ord, Num)
 

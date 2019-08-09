@@ -2,18 +2,26 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE RankNTypes #-}
 module Main where
 
+import           Control.Concurrent
+import           Control.Exception
 import           Control.Lens
-import           Control.Monad (guard)
+import           Control.Monad (forever, guard, void)
 import           Control.Monad.Fix (MonadFix)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import qualified Data.ByteString as BS
 import qualified Data.Text as T
 import qualified Data.IntMap as M
+import           Data.IORef
 import           Data.List.NonEmpty (NonEmpty)
+import qualified Data.Vector.Storable.Mutable as MV
 import           Reflex
 import           Reflex.Dom
+import qualified SDL
+import           System.Posix.Signals
 import           System.Random (randomIO)
 import           Text.Read (readMaybe)
 
@@ -42,31 +50,63 @@ newtype BeatCode = BeatCode T.Text deriving (Show, Eq)
 
 makeLenses ''LayerUI
 
+handler :: IO ()
+handler = do
+  putStrLn "test"
+
 main :: IO ()
 main = do
-  -- set up the backend stuff
-  -- - MVar with the layers models
-  -- - MVar with the tempo
-  -- - MVar with the volume
-  -- will supply them to the network via ReaderT
+  let layers = M.singleton 1 ( newLayer $ Pitch ANat 4 )
+      tempo = 120
+      vol = 10
+  layerRef          <- newIORef layers
+  tempoRef          <- newIORef tempo
+  volumeRef         <- newIORef vol
+  elapsedSamplesRef <- newIORef 0
+  semaphore         <- newSemaphore
+
+  SDL.initialize [SDL.InitAudio]
+  (audioDevice, _audioSpec)
+    <- SDL.openAudioDevice
+     $ openDeviceSpec
+     $ audioCallback semaphore layerRef tempoRef elapsedSamplesRef volumeRef
+
+  let startPlayback = SDL.setAudioDevicePlaybackState audioDevice SDL.Play
+      stopPlayback = SDL.setAudioDevicePlaybackState audioDevice SDL.Pause
+
+      initState = JamState { _jamStLayersRef      = layerRef
+                           , _jamStTempoRef       = tempoRef
+                           , _jamStVolumeRef      = volumeRef
+                           , _jamStElapsedSamples = elapsedSamplesRef
+                           , _jamStSemaphore      = semaphore
+                           , _jamStStartPlayback  = startPlayback
+                           , _jamStStopPlayback   = stopPlayback
+                           }
+
+  installHandler keyboardSignal (Catch handler) Nothing
 
   css <- BS.readFile "app/css/styles.css"
+  pure ()
+
   mainWidgetWithCss css $ el "div" $ do
     rec
-      newLayerIdDyn <- count newLayerEv
+      newLayerIdDyn <- holdDyn 1 $ maybe 1 (succ . fst) . M.lookupMax
+                               <$> current layerMapDyn <@ newLayerEv
       randomNoteEv <- performEvent $ generateRandomNote <$ newLayerEv
       -- TODO need to perform layer adding and removing IO actions
-      newLayerNoteDyn <- holdDyn ( Pitch ANat ( Octave 4 ) ) randomNoteEv
+      newLayerNoteDyn <- holdDyn ( Pitch ANat 4 ) randomNoteEv
       let newLayerEventDyn = NewLayer
                          <$> newLayerIdDyn
-                         <*> ( LayerUI "1" "" <$> newLayerNoteDyn )
+                         <*> ( LayerUI "1" "0" <$> newLayerNoteDyn )
 
           layerEvents = leftmost [ updated newLayerEventDyn, editLayerEvents ]
+          initLayerMap = M.singleton 1 ( LayerUI "1" "0" ( Pitch ANat 4 ) )
 
-      layerMapDyn <- foldDyn applyLayerEvent mempty layerEvents
+      layerMapDyn <- foldDyn applyLayerEvent initLayerMap layerEvents
 
-      let layerWidgetsDyn = ( \m -> M.traverseWithKey ( \i layerUI -> layerWidget i layerUI m ) m )
-                        <$> layerMapDyn
+      let layerWidgetsDyn =
+            ( \m -> M.traverseWithKey ( \i layerUI -> layerWidget initState i layerUI m ) m )
+              <$> layerMapDyn
 
       -- create the layer widgets
       editLayerEvents <- switchHold never . fmap (leftmost . M.elems)
@@ -75,8 +115,8 @@ main = do
       newLayerEv <- button "New Layer"
 
       -- Adds a new layer to the backend
-      performEvent_ $ createNewLayer <$> current newLayerIdDyn
-                                     <@> updated newLayerNoteDyn
+      performEvent_ $ createNewLayer initState <$> current newLayerIdDyn
+                                               <@> updated newLayerNoteDyn
 
       playbackStateDyn <- accum (const id)
                                 Stopped
@@ -87,41 +127,52 @@ main = do
           canPauseDyn = fmap (== Playing) playbackStateDyn
 
       startEv <- (Playing <$) <$> toggleButton canPlayDyn "Start"
-      performEvent_ $ (liftIO $ putStrLn "Starting") <$ startEv
+      performEvent_ $ (liftIO $ startPlayback) <$ startEv
+
+      let stopAction = liftIO $ do
+            initState^.jamStStopPlayback
+            writeIORef ( initState^.jamStElapsedSamples ) 0
+            modifyIORef' ( initState^.jamStLayersRef ) ( fmap resetLayer )
 
       stopEv <- (Stopped <$) <$> toggleButton canStopDyn "Stop"
-      performEvent_ $ (liftIO $ putStrLn "Stopping") <$ stopEv
+      performEvent_ $ stopAction <$ stopEv
 
       pauseEv <- (Paused <$) <$> toggleButton canPauseDyn "Pause"
-      performEvent_ $ (liftIO $ putStrLn "Pausing") <$ pauseEv
+      performEvent_ $ (liftIO $ stopPlayback) <$ pauseEv
 
     -- tempo
     text "Tempo: "
-    tempoDyn <- numberInput (120.0 :: Double) (> 0)
-    performEvent_ $ (liftIO $ putStrLn "Changing tempo") <$ updated tempoDyn
+    tempoDyn <- numberInput (120.0 :: BPM) parseBpm bpmToText 1
+    performEvent_ $ changeTempo initState <$> updated tempoDyn
+
     -- volume
     text "Vol.: "
-    volumeDyn <- numberInput (5.0 :: Double) (\x -> x >= 0 && x <= 10)
-    performEvent_ $ (liftIO $ putStrLn "Changing volume") <$ updated volumeDyn
+    volumeDyn <- numberInput (5.0 :: Vol) parseVol volToText 0.2
+    performEvent_ $ changeVol initState <$> updated volumeDyn
 
     pure ()
 
 layerWidget :: (MonadHold t m, MonadFix m, DomBuilder t m, PerformEvent t m, MonadIO (Performable m))
-            => Int -> LayerUI -> M.IntMap LayerUI -> m (Event t LayerEvent)
-layerWidget layerId layerUI layerMap = el "div" $ do
+            => JamState -> Int -> LayerUI -> M.IntMap LayerUI -> m (Event t LayerEvent)
+layerWidget st layerId layerUI layerMap = el "div" $ do
   el "div" . text $ "Layer " <> showText layerId
 
   let validateBeatCode t = do
         let beatCodes = _layerUIBeatCode <$> layerMap
             beatCodes' = M.insert layerId t beatCodes
-        code <- parseBeat layerId beatCodes' t
-        pure (code, t)
+        -- reparse all layers
+        -- TODO should only fail if the target layer fails to parse,
+        -- otherwise should use the existing beatcode for that layer.
+        -- we don't want to mark the current layer invalid because a
+        -- different layer was invalid
+        parsedCodes <- M.traverseWithKey (\i -> parseBeat i beatCodes') beatCodes'
+        pure (parsedCodes, t)
 
   beatCodeInput <- textFieldInput (_layerUIBeatCode layerUI)
                                   validateBeatCode
                                   (const never)
 
-  let beatCodeEv = fmap (updateLayerBeatCode layerId . fst) beatCodeInput
+  let beatCodeEv = fmap (liftIO . applyLayerBeatChange st . fst) beatCodeInput
   performEvent_ beatCodeEv
   let changeBeatCodeEv = ffor beatCodeInput $ \(_, txt) ->
         ChangeLayer layerId (layerUI & layerUIBeatCode .~ txt)
@@ -130,22 +181,25 @@ layerWidget layerId layerUI layerMap = el "div" $ do
                                parsePitch
                                (const never)
 
-  let pitchEv = fmap (updateLayerNote layerId) pitchInput
+  let pitchEv = fmap (liftIO . applyLayerSourceChange st layerId) pitchInput
   performEvent_ pitchEv
   let changePitchEv = ffor pitchInput $ \n ->
         ChangeLayer layerId (layerUI & layerUIPitch .~ n)
 
+      validateOffset t = do
+        offset <- parseOffset t
+        pure (offset, t)
   offsetInput <- textFieldInput (_layerUIOffset layerUI)
-                                Just
+                                validateOffset
                                 (const never)
 
-  let offsetEv = fmap (updateLayerOffset layerId) offsetInput
+  let offsetEv = fmap (liftIO . applyLayerOffsetChange st layerId . fst) offsetInput
   performEvent_ offsetEv
-  let changeOffsetEv = ffor offsetInput $ \o ->
+  let changeOffsetEv = ffor offsetInput $ \(_, o) ->
         ChangeLayer layerId (layerUI & layerUIOffset .~ o)
 
   deleteEv <- ( RemoveLayer layerId <$ ) <$> button "X"
-  performEvent_ $ deleteLayer layerId <$ deleteEv
+  performEvent_ $ deleteLayer st layerId <$ deleteEv
 
   pure $ leftmost [ deleteEv
                   , changeBeatCodeEv
@@ -195,26 +249,19 @@ textFieldInput initialText validator mkSetValEv = do
 
   pure $ fmapMaybe id mbValEv
 
-numberInput :: (MonadHold t m, MonadFix m, DomBuilder t m, Show a, Read a, Enum a)
-            => a -> (a -> Bool) -> m (Dynamic t a)
-numberInput startingValue validator = do
+numberInput :: (MonadHold t m, MonadFix m, DomBuilder t m, Num r)
+            => r -> (T.Text -> Maybe r) -> (r -> T.Text) -> r -> m (Dynamic t r)
+numberInput startingValue validator toText delta = do
   rec
-    let validate v = do
-          n <- readMaybe $ T.unpack v
-          guard $ validator n
-          pure n
-        s ev =
-          let upArrowEv   = succ <$ ffilter ( == ( 38 :: Word ) ) ev
-              downArrowEv = pred <$ ffilter ( == ( 40 :: Word ) ) ev
-              setVal cur f
-                | validator new = Just $ showText new
-                | otherwise = Nothing
+    let s ev =
+          let upArrowEv   = ( + delta ) <$ ffilter ( == ( 38 :: Word ) ) ev
+              downArrowEv = ( subtract delta ) <$ ffilter ( == ( 40 :: Word ) ) ev
+              setVal cur f = toText <$> ( validator . toText ) new
                 where new = f cur
-              setValEv = fmapMaybe id $ setVal <$> current inputDyn
-                                               <@> leftmost [upArrowEv, downArrowEv]
-           in setValEv
+           in fmapMaybe id $ setVal <$> current inputDyn
+                                    <@> leftmost [upArrowEv, downArrowEv]
 
-    input <- textFieldInput ( showText startingValue ) validate s
+    input <- textFieldInput ( toText startingValue ) validator s
     inputDyn <- holdDyn startingValue input
 
   pure inputDyn
@@ -231,39 +278,66 @@ toggleButton enabledDyn label = do
   (btn, _) <- elDynAttr' "button" attrs $ text label
   pure $ () <$ domEvent Click btn
 
--- the list function takes a Map Int Layer and a function which turns a
--- Dynamic Layer into a widget. Is it necessary for the Layer to be in a
--- Dynamic since all the effects that will occur on the layer will happen
--- form within the widget itself?
-
 applyLayerEvent :: LayerEvent -> M.IntMap LayerUI -> M.IntMap LayerUI
 applyLayerEvent (NewLayer i l) = M.insert i l
 applyLayerEvent (RemoveLayer i) = M.delete i
 applyLayerEvent (ChangeLayer i l) = at i . _Just .~ l
 
-createNewLayer :: MonadIO m => Int -> Pitch -> m ()
-createNewLayer idx pitch = liftIO $
-  putStrLn $ "Creating new layer " <> show idx <> T.unpack (pitchText pitch)
+createNewLayer :: MonadIO m => JamState -> Int -> Pitch -> m ()
+createNewLayer st idx pitch = liftIO . signalSemaphore ( st^.jamStSemaphore ) $ do
+  elapsedSamples <- readIORef ( st^.jamStElapsedSamples )
+  tempo <- readIORef ( st^.jamStTempoRef )
+  let elapsedCells =
+        numSamplesToCellValue tempo elapsedSamples
+      layer = newLayer pitch
 
-deleteLayer :: MonadIO m => Int -> m ()
-deleteLayer _idx = liftIO $
-  putStrLn "Deleting Layer"
+  void $ modifyIORef' ( st^.jamStLayersRef )
+                      ( fmap ( syncLayer elapsedCells )
+                      . ( at idx ?~ layer )
+                      )
 
-updateLayerBeatCode :: MonadIO m => Int -> NonEmpty Cell' -> m ()
-updateLayerBeatCode _layerId _newBeatCode = liftIO $
-  putStrLn "Update beatcode of Layer."
+deleteLayer :: MonadIO m => JamState -> Int -> m ()
+deleteLayer st idx = liftIO $
+  modifyIORef' ( st^.jamStLayersRef )
+               ( sans idx )
 
-updateLayerNote :: MonadIO m => Int -> Pitch -> m ()
-updateLayerNote layerId newNote = liftIO $
-  putStrLn $ "Update note of Layer " <> show layerId <> " to " <> (T.unpack $ pitchText newNote)
+changeTempo :: MonadIO m => JamState -> BPM -> m ()
+changeTempo st newTempo = liftIO . signalSemaphore ( st^.jamStSemaphore ) $ do
+  currentTempo <- readIORef $ st^.jamStTempoRef
+  let ratio = getBPM $ currentTempo / newTempo
 
-updateLayerOffset :: MonadIO m => Int -> T.Text -> m ()
-updateLayerOffset layerId offset = liftIO $
-  putStrLn $ "Update offset of Layer " <> show layerId <> " to " <> show offset
+  modifyIORef' ( st^.jamStElapsedSamples ) ( * ratio )
+  writeIORef ( st^.jamStTempoRef ) newTempo
+
+changeVol :: MonadIO m => JamState -> Vol -> m ()
+changeVol st newVol = liftIO $ do
+  currentVol <- readIORef $ st^.jamStVolumeRef
+  writeIORef ( st^.jamStVolumeRef ) newVol
 
 generateRandomNote :: MonadIO m => m Pitch
 generateRandomNote = liftIO randomIO
 
 showText :: Show a => a -> T.Text
 showText = T.pack . show
+
+openDeviceSpec :: (forall s. SDL.AudioFormat s -> MV.IOVector s -> IO ()) -> SDL.OpenDeviceSpec
+openDeviceSpec callback = SDL.OpenDeviceSpec
+  { SDL.openDeviceFreq = SDL.Mandate 44100
+    -- ^ The output audio frequency in herts.
+  , SDL.openDeviceFormat = SDL.Mandate SDL.FloatingNativeAudio
+    -- ^ The format of audio that will be sampled from the output buffer.
+  , SDL.openDeviceChannels = SDL.Mandate SDL.Stereo
+    -- ^ The amount of audio channels.
+  , SDL.openDeviceSamples = 1024
+    -- ^ Output audio buffer size in samples. This should be a power of 2.
+  , SDL.openDeviceCallback = callback
+    -- ^ A callback to invoke whenever new sample data is required. The callback
+    -- will be passed a single 'MV.MVector' that must be filled with audio data.
+  , SDL.openDeviceUsage = SDL.ForPlayback
+    -- ^ How you intend to use the opened 'AudioDevice' - either for outputting
+    -- or capturing audio.
+  , SDL.openDeviceName = Nothing
+    -- ^ The name of the 'AudioDevice' that should be opened. If 'Nothing',
+    -- any suitable 'AudioDevice' will be used.
+  }
 
