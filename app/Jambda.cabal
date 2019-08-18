@@ -32,6 +32,17 @@ executable Jambda
                , Jambda.Types.Newtypes
                , Jambda.Types.Pitch
                , Jambda.Types.Semaphore
+               , Jambda.Types.UI
+               , Jambda.UI
+               , Jambda.UI.RootWidget
+               , Jambda.UI.Widgets
+               , Jambda.UI.Widgets.Layer
+               , Jambda.UI.Widgets.Layer.BeatCode
+               , Jambda.UI.Widgets.Layer.Offset
+               , Jambda.UI.Widgets.Layer.Source
+               , Jambda.UI.Widgets.NumberInput
+               , Jambda.UI.Widgets.TextField
+               , Jambda.UI.Widgets.ToggleButton
   -- other-extensions:
   build-depends:       base >=4.11 && <4.12
                      , bytestring
