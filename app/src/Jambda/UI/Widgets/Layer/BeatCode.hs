@@ -11,7 +11,6 @@ import           Data.List.NonEmpty (NonEmpty)
 import qualified Data.Text as T
 
 import           Reflex
-import           Reflex.Dom
 
 import           Jambda.Data (applyLayerBeatChange, parseBeat)
 import           Jambda.Types
@@ -28,7 +27,8 @@ validateBeatCode layerMap layerId t = do
 mkBeatCodeInput :: JambdaUI t m
                 => JamState -> M.IntMap LayerUI -> Int -> LayerUI -> m (Event t LayerEvent)
 mkBeatCodeInput st layerMap layerId layerUI = do
-  beatCodeInput <- textFieldInput (_layerUIBeatCode layerUI)
+  beatCodeInput <- textFieldInput "BeatCode"
+                                  (_layerUIBeatCode layerUI)
                                   (validateBeatCode layerMap layerId)
                                   (const never)
 

@@ -8,7 +8,6 @@ import           Control.Lens
 import           Control.Monad.IO.Class (liftIO)
 
 import           Reflex
-import           Reflex.Dom
 
 import           Jambda.Data (applyLayerOffsetChange, parseOffset)
 import           Jambda.Types
@@ -21,7 +20,8 @@ mkOffsetInput st layerId layerUI = do
         offset <- parseOffset t
         pure (offset, t)
 
-  offsetInput <- textFieldInput (_layerUIOffset layerUI)
+  offsetInput <- textFieldInput "Offset"
+                                (_layerUIOffset layerUI)
                                 validateOffset
                                 (const never)
 

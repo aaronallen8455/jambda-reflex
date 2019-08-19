@@ -43,10 +43,14 @@ executable Jambda
                , Jambda.UI.Widgets.NumberInput
                , Jambda.UI.Widgets.TextField
                , Jambda.UI.Widgets.ToggleButton
+
   -- other-extensions:
   build-depends:       base >=4.11 && <4.12
                      , bytestring
                      , containers
+                     , data-default-class
+                     , file-embed
+                     , jsaddle-wkwebview
                      , lens
                      , megaparsec
                      , mtl

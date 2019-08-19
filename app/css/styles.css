@@ -10,3 +10,13 @@ input {
 .edited-field {
   background-color: #383838;
 }
+
+.input-wrapper {
+  display: inline-block;
+}
+
+.input-wrapper label {
+  display: block;
+  text-transform: uppercase;
+  font-size: .4em;
+}

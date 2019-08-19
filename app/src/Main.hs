@@ -1,11 +1,15 @@
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Main where
 
-import qualified Data.ByteString as BS
+import           Data.Default.Class (def)
+import           Data.FileEmbed (embedFile)
 import qualified Data.IntMap as M
 import           Data.IORef
 import qualified Data.Vector.Storable.Mutable as MV
-import           Reflex.Dom
+
+import qualified Language.Javascript.JSaddle.WKWebView as WebView
+import qualified Reflex.Dom.Main as Main
 import qualified SDL
 
 import           Jambda.Data
@@ -17,6 +21,7 @@ main = do
   let layers = M.singleton 1 ( newLayer $ Pitch ANat 4 )
       tempo = 120
       vol = 10
+
   layerRef          <- newIORef layers
   tempoRef          <- newIORef tempo
   volumeRef         <- newIORef vol
@@ -41,9 +46,16 @@ main = do
                            , _jamStStopPlayback   = stopPlayback
                            }
 
-  css <- BS.readFile "app/css/styles.css"
+  let css = $(embedFile "../app/css/styles.css")
 
-  mainWidgetWithCss css (rootWidget initState)
+      -- JSaddle currently does nothing with the appdelegate handlers. Hopefully it will in the future.
+      appDelegateConfig =
+        def { WebView._appDelegateConfig_applicationWillTerminate = SDL.closeAudioDevice audioDevice >> SDL.quit
+            }
+
+  WebView.runWithAppConfig appDelegateConfig
+    $ Main.mainWidgetWithCss css (rootWidget initState)
+  --mainWidgetWithCss css (rootWidget initState)
 
 openDeviceSpec :: (forall s. SDL.AudioFormat s -> MV.IOVector s -> IO ()) -> SDL.OpenDeviceSpec
 openDeviceSpec callback = SDL.OpenDeviceSpec
