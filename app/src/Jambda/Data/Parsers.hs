@@ -2,7 +2,6 @@ module Jambda.Data.Parsers
   ( parseBeat
   , parseBpm
   , parseVol
-  , parseCell
   , parsePitch
   , parseOffset
   ) where
@@ -18,6 +17,7 @@ import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.IntMap as M
 import           Data.Semigroup (sconcat)
 import qualified Data.Text as T
+import qualified Data.Vector as V
 import           Data.Void (Void)
 import           GHC.Exts (IsList(..))
 import           GHC.Float (double2Float)
@@ -28,11 +28,12 @@ import           Jambda.Types
 
 type Parser = Parsec Void T.Text
 
-parseBeat :: Int -> M.IntMap T.Text -> T.Text -> Maybe (NonEmpty Cell')
-parseBeat idx refMap = join . parseMaybe ( beatP idx refMap <* eof )
-
-parseCell :: T.Text -> Maybe Cell'
-parseCell = parseMaybe ( cellP ( > 0 ) )
+parseBeat :: Int
+          -> M.IntMap T.Text
+          -> V.Vector Wav
+          -> T.Text
+          -> Maybe (NonEmpty Cell')
+parseBeat idx refMap wavs = join . parseMaybe ( beatP idx refMap wavs <* eof )
 
 parseOffset :: T.Text -> Maybe CellValue
 parseOffset = parseMaybe ( cellValueP ( >= 0 ) )
@@ -109,14 +110,26 @@ cellValueP pred' = do
   guard $ pred' v
   pure $ CellValue v
 
-cellP :: (Double -> Bool) -> Parser Cell'
-cellP pred' = do
+soundSourceP :: V.Vector Wav -> Parser SoundSource
+soundSourceP wavs = char '@' *> parser <* space
+  where
+    parser
+        = ( SSPitch <$> pitchP )
+      <|> ( SSWav   <$> wavP   )
+    wavP = do
+      i <- pred <$> intP
+      case wavs ^? ix i of
+        Just wav -> pure wav
+        Nothing  -> fail "invalid wav index"
+
+cellP :: V.Vector Wav -> (Double -> Bool) -> Parser Cell'
+cellP wavs pred' = do
   v <- cellValueP pred'
-  p <- optional $ char '@' *> pitchP <* space
+  p <- optional $ soundSourceP wavs
   pure $ Cell v p
 
-refP :: Int -> M.IntMap T.Text -> Parser (Maybe (NonEmpty Cell'))
-refP idx refMap = do
+refP :: Int -> M.IntMap T.Text -> V.Vector Wav -> Parser (Maybe (NonEmpty Cell'))
+refP idx refMap wavs = do
   refIdx <- char '$' *> ( ( pred <$> intP ) <|> ( idx <$ char' 's' ) )
   guard $ refIdx >= 0
   case M.lookup refIdx refMap of
@@ -124,15 +137,15 @@ refP idx refMap = do
     Just refStr ->
       maybe ( fail "reference failed to parse" )
             ( pure . Just )
-            ( parseBeat idx ( M.delete refIdx refMap ) refStr )
+            ( parseBeat idx ( M.delete refIdx refMap ) wavs refStr )
 
-repableP :: Int -> M.IntMap T.Text -> Parser (Maybe (NonEmpty Cell'))
-repableP idx refMap = try ( refP idx refMap )
-                  <|> ( Just . pure <$> cellP ( > 0 ) )
+repableP :: Int -> M.IntMap T.Text -> V.Vector Wav -> Parser (Maybe (NonEmpty Cell'))
+repableP idx refMap wavs = try ( refP idx refMap wavs )
+                       <|> ( Just . pure <$> cellP wavs ( > 0 ) )
 
-repCellP :: Int -> M.IntMap T.Text -> Parser (Maybe (NonEmpty Cell'))
-repCellP idx refMap = do
-  mbCells <- repableP idx refMap <* space :: Parser (Maybe (NonEmpty Cell'))
+repCellP :: Int -> M.IntMap T.Text -> V.Vector Wav -> Parser (Maybe (NonEmpty Cell'))
+repCellP idx refMap wavs = do
+  mbCells <- repableP idx refMap wavs <* space :: Parser (Maybe (NonEmpty Cell'))
   case mbCells of
     Nothing -> pure Nothing
     Just cells -> do
@@ -148,11 +161,11 @@ repCellP idx refMap = do
            . reverse $ ( NonEmpty.reverse $ fmap ( + ltm ) lastCell :| rest )
                      : replicate ( reps - 1 ) cells
 
-blockRepP :: Int -> M.IntMap T.Text -> Parser (Maybe (NonEmpty Cell'))
-blockRepP idx refMap = do
+blockRepP :: Int -> M.IntMap T.Text -> V.Vector Wav -> Parser (Maybe (NonEmpty Cell'))
+blockRepP idx refMap wavs = do
     mbInner <- between ( char '[' <* space )
                        ( char ']' <* space )
-                       ( beatP idx refMap )
+                       ( beatP idx refMap wavs )
     (reps, ltm) <- tagP <* space
 
     case mbInner of
@@ -173,11 +186,11 @@ blockRepP idx refMap = do
       ltm <- expressionP
       pure (reps, CellValue ltm)
 
-blockMultP :: Int -> M.IntMap T.Text -> Parser (Maybe (NonEmpty Cell'))
-blockMultP idx refMap = do
+blockMultP :: Int -> M.IntMap T.Text -> V.Vector Wav -> Parser (Maybe (NonEmpty Cell'))
+blockMultP idx refMap wavs = do
   mbInner <- between ( char '{' <* space )
                      ( char '}' <* space )
-                     ( beatP idx refMap )
+                     ( beatP idx refMap wavs )
   factor <- CellValue <$> expressionP
   guard $ factor > 0
   pure $ ( fmap . fmap . fmap ) ( * factor ) mbInner
@@ -186,11 +199,11 @@ blockMultP idx refMap = do
 -- due to it occuring recursively, we want to delete that cell without the
 -- parser failing. The Semigroup instance of Maybe NonEmpty facilitates this;
 -- the Nothing case only occurs in the event of a rejected reference key
-beatP :: Int -> M.IntMap T.Text -> Parser (Maybe (NonEmpty Cell'))
-beatP idx refMap = fmap sconcat . nonEmptyGuard
-      $ space *> (   try ( repCellP idx refMap )
-                 <|> try ( blockRepP idx refMap )
-                 <|> blockMultP idx refMap
+beatP :: Int -> M.IntMap T.Text -> V.Vector Wav -> Parser (Maybe (NonEmpty Cell'))
+beatP idx refMap wavs = fmap sconcat . nonEmptyGuard
+      $ space *> (   try ( repCellP idx refMap wavs )
+                 <|> try ( blockRepP idx refMap wavs )
+                 <|> blockMultP idx refMap wavs
                  ) `sepBy1` ( char ',' <* space )
 
 nonEmptyGuard :: Parser [a] -> Parser (NonEmpty a)

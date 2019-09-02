@@ -27,29 +27,34 @@ import           Jambda.Types
 
 -- | Create a new layer with the given Pitch using defaults
 -- for all other fields
-newLayer :: Pitch -> Layer
-newLayer pitch = Layer
-  { _layerSource = source
+newLayer :: SoundSource -> Layer
+newLayer soundSource = Layer
+  { _layerSamples = source
   , _layerBeat = pure ( Cell 1 Nothing )
   , _layerParsedCode = [ Cell 1 Nothing ]
   , _layerCellOffset = 0
   , _layerCellPrefix = 0
-  , _layerSourcePrefix = []
-  , _layerSourceType = pitch
+  , _layerSamplePrefix = []
+  , _layerSoundSource = soundSource
   }
     where
-      freq = pitchToFreq pitch
-      source = linearTaper taperLength $ sineWave freq 0
+      source = case soundSource of
+                 SSPitch pitch ->
+                   let freq = pitchToFreq pitch
+                    in linearTaper taperLength $ sineWave freq 0
+                 SSWav wav -> wav^.wavSamples
 
 -- | Progress a layer by the given number of samples
 -- returning the resulting samples and the modified layer.
 readChunk :: Int -> BPM -> Layer -> (Layer, [Sample])
 readChunk bufferSize bpm layer@Layer{..}
+  -- Only read from the prefix if it is not fully consumed
   | prefixValue >= cellToTake =
-    ( layer & layerSourcePrefix %~ (drop bufferSize)
+    ( layer & layerSamplePrefix %~ drop bufferSize
             & layerCellPrefix   -~ cellToTake
-    , Stream.take bufferSize $ _layerSourcePrefix `Stream.prepend` silence
+    , Stream.take bufferSize $ _layerSamplePrefix `Stream.prepend` silence
     )
+  -- if prefix is fully consumed, `getSamples` provides the rest
   | otherwise = ( remLayer, take bufferSize $ samples )
   where
     cellToTake  = numSamplesToCellValue bpm $ fromIntegral bufferSize
@@ -57,12 +62,12 @@ readChunk bufferSize bpm layer@Layer{..}
 
     (numPrefixSamples, remPrefixCell) = numSamplesForCellValue bpm prefixValue
     prefixSamples =
-      Stream.take numPrefixSamples $ _layerSourcePrefix `Stream.prepend` silence
+      Stream.take numPrefixSamples $ _layerSamplePrefix `Stream.prepend` silence
     (remLayer, newSamples) =
       getSamples bpm
                  ( layer & layerBeat %~ onHead ( fmap ( + remPrefixCell ) ) )
                  ( bufferSize - numPrefixSamples )
-                 ( drop numPrefixSamples _layerSourcePrefix )
+                 ( drop numPrefixSamples _layerSamplePrefix )
     samples = prefixSamples ++ newSamples
 
 -- | Pull the specified number of samples from a layer.
@@ -71,25 +76,25 @@ getSamples :: BPM -> Layer -> Int -> [Sample] -> (Layer, [Sample])
 getSamples bpm layer nsamps prevSource
   | nsamps <= wholeCellSamps = (newLayer', take nsamps source)
   | otherwise = _2 %~ ( take wholeCellSamps source ++ )
-              $ getSamples bpm
-                           ( layer & layerBeat %~ onHead ( fmap ( + leftover ) ) )
-                           ( nsamps - wholeCellSamps )
-                           ( drop wholeCellSamps source )
+              $ getSamples
+                  bpm
+                  ( newLayer' & layerBeat %~ onHead ( fmap ( + leftover ) ) )
+                  ( nsamps - wholeCellSamps )
+                  ( drop wholeCellSamps source )
   where
     ( c :> cells ) = layer^.layerBeat
-    source = linearTaper taperLength $
-      maybe ( dovetail ( pitchToFreq $ layer^.layerSourceType ) $ prevSource )
-            id
-            ( dovetail <$> ( pitchToFreq <$> c^.cellSource )
-                       <*> Just prevSource
-            )
+    source = case maybe (layer^.layerSoundSource) id ( c^.cellSource ) of
+               SSPitch pitch -> linearTaper taperLength
+                              $ dovetail ( pitchToFreq pitch ) prevSource
+               SSWav wav -> wav^.wavSamples
+
     ( wholeCellSamps, leftover ) = numSamplesForCellValue bpm ( c^.cellValue )
     newCellPrefix = c^.cellValue
                   - numSamplesToCellValue bpm ( fromIntegral nsamps )
                   + leftover
     newLayer' = layer & layerBeat         .~ cells
                       & layerCellPrefix   .~ newCellPrefix
-                      & layerSourcePrefix .~ (drop nsamps source)
+                      & layerSamplePrefix .~ (drop nsamps source)
 
 -- | Modifies the entire layer map, syncing to the elasped samples.
 modifyLayers :: JamState
@@ -127,7 +132,6 @@ applyLayerBeatChange st allParsedCells = do
                    allParsedCells
 
 -- | Apply the current contents of the offset field of a layer
--- returns true if beat code is valid.
 applyLayerOffsetChange :: JamState
                        -> Int
                        -> CellValue
@@ -136,14 +140,13 @@ applyLayerOffsetChange st i cellVal =
   modifyLayer st i ( layerCellOffset .~ cellVal )
 
 -- | Apply the contents of the source field to the layer
--- returning true if valid
 applyLayerSourceChange :: JamState
                        -> Int
-                       -> Pitch
+                       -> SoundSource
                        -> IO ()
-applyLayerSourceChange st i pitch =
+applyLayerSourceChange st i src =
   modifyIORef' ( st^.jamStLayersRef ) $ \layers ->
-    let mbLayer = modifySource pitch <$> layers ^? ix i
+    let mbLayer = modifySource src <$> layers ^? ix i
      in maybe layers ( \x -> layers & ix i .~ x ) mbLayer
 
 -- | Fast-forward a layer to the current time position
@@ -167,21 +170,24 @@ syncLayer elapsedCells layer
       | otherwise = dropCells ( dc - c^.cellValue ) cs
 
 -- | Change the sound source (Pitch) of the layer
-modifySource :: Pitch -> Layer -> Layer
-modifySource pitch layer = do
-  let freq = pitchToFreq pitch
-      wave = sineWave freq 0
-      newSource = linearTaper taperLength wave
+modifySource :: SoundSource -> Layer -> Layer
+modifySource soundSource layer =
+  let samples = case soundSource of
+                  SSPitch pitch ->
+                    let freq = pitchToFreq pitch
+                        wave = sineWave freq 0
+                     in linearTaper taperLength wave
+                  SSWav wav -> wav^.wavSamples
 
-   in layer & layerSource     .~ newSource
-            & layerSourceType .~ pitch
+   in layer & layerSamples     .~ samples
+            & layerSoundSource .~ soundSource
 
 -- | Reset a layer to it's initial state
 resetLayer :: Layer -> Layer
 resetLayer layer =
   layer & layerBeat         .~ ( Stream.cycle $ layer^.layerParsedCode )
         & layerCellPrefix   .~ ( layer^.layerCellOffset )
-        & layerSourcePrefix .~ []
+        & layerSamplePrefix .~ []
 
 onHead :: (a -> a) -> Stream a -> Stream a
 onHead f ( x :> xs ) = f x :> xs

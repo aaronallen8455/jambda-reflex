@@ -25,19 +25,23 @@ rootWidget st = el "div" $ do
 
     randomNoteEv <- performEvent $ generateRandomNote <$ newLayerEv
 
-    newLayerNoteDyn <- holdDyn ( Pitch ANat 4 ) randomNoteEv
+    newLayerNoteDyn <- fmap SSPitch <$> holdDyn ( Pitch ANat 4 ) randomNoteEv
     let newLayerEventDyn = NewLayer
                        <$> newLayerIdDyn
                        <*> ( mkNewLayerUI "1" "0" <$> newLayerNoteDyn )
 
         layerEvents = leftmost [ updated newLayerEventDyn, editLayerEvents ]
-        initLayerMap = M.singleton 1 ( mkNewLayerUI "1" "0" ( Pitch ANat 4 ) )
+        initLayerMap = M.singleton 1 ( mkNewLayerUI "1" "0" ( SSPitch $ Pitch ANat 4 ) )
 
     layerMapDyn <- foldDyn applyLayerEvent initLayerMap layerEvents
 
     let layerWidgetsDyn =
           ( \m -> M.traverseWithKey ( \i layerUI -> layerWidget st i layerUI m ) m )
             <$> layerMapDyn
+
+    -- quit button
+    quitEv <- button "Quit"
+    performEvent_ $ liftIO ( st^.jamStFinalizer ) <$ quitEv
 
     -- create the layer widgets
     editLayerEvents <- switchHold never . fmap (leftmost . M.elems)
@@ -88,13 +92,13 @@ applyLayerEvent (NewLayer i l) = M.insert i l
 applyLayerEvent (RemoveLayer i) = M.delete i
 applyLayerEvent (ChangeLayer i l) = at i . _Just .~ l
 
-createNewLayer :: MonadIO m => JamState -> Int -> Pitch -> m ()
-createNewLayer st idx pitch = liftIO . signalSemaphore ( st^.jamStSemaphore ) $ do
+createNewLayer :: MonadIO m => JamState -> Int -> SoundSource -> m ()
+createNewLayer st idx soundSource = liftIO . signalSemaphore ( st^.jamStSemaphore ) $ do
   elapsedSamples <- readIORef ( st^.jamStElapsedSamples )
   tempo <- readIORef ( st^.jamStTempoRef )
   let elapsedCells =
         numSamplesToCellValue tempo elapsedSamples
-      layer = newLayer pitch
+      layer = newLayer soundSource
 
   void $ modifyIORef' ( st^.jamStLayersRef )
                       ( fmap ( syncLayer elapsedCells )

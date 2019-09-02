@@ -33,7 +33,7 @@ audioCallback semaphore layersRef bpmRef elapsedSamplesRef volumeRef SDL.Floatin
 
   let numSamples = MV.length vec `div` 2                   :: Int
       chunkMap   = readChunk numSamples bpm <$> layers     :: Map.IntMap (Layer, [Sample])
-      samples    = map ( snd . snd ) $ Map.toList chunkMap :: [[Sample]]
+      samples    = map snd $ Map.elems chunkMap            :: [[Sample]]
       newLayers  = fst <$> chunkMap                        :: Map.IntMap Layer
       combined   = map ( ( * ( vol / 10 ) ) . getSample )
                  $ aggregateChunks samples

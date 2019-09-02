@@ -26,7 +26,7 @@ layerWidget st layerId layerUI layerMap = el "div" $ do
   changeBeatCodeEv <- mkBeatCodeInput st layerMap layerId layerUI
 
   -- Pitch Input
-  changePitchEv <- mkPitchInput st layerId layerUI
+  changeSourceEv <- mkSourceInput st layerId layerUI
 
   -- Offset input
   changeOffsetEv <- mkOffsetInput st layerId layerUI
@@ -37,7 +37,7 @@ layerWidget st layerId layerUI layerMap = el "div" $ do
 
   pure $ leftmost [ deleteEv
                   , changeBeatCodeEv
-                  , changePitchEv
+                  , changeSourceEv
                   , changeOffsetEv
                   ]
 

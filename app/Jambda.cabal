@@ -24,13 +24,16 @@ executable Jambda
                , Jambda.Data.Layer
                , Jambda.Data.Parsers
                , Jambda.Data.Stream
+               , Jambda.Data.Wav
                , Jambda.Types
                , Jambda.Types.Cell
                , Jambda.Types.JamState
                , Jambda.Types.Layer
                , Jambda.Types.Name
                , Jambda.Types.Newtypes
-               , Jambda.Types.Pitch
+               , Jambda.Types.SoundSource
+               , Jambda.Types.SoundSource.Pitch
+               , Jambda.Types.SoundSource.Wav
                , Jambda.Types.Semaphore
                , Jambda.Types.UI
                , Jambda.UI

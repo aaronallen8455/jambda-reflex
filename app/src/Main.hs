@@ -18,7 +18,7 @@ import           Jambda.UI (rootWidget)
 
 main :: IO ()
 main = do
-  let layers = M.singleton 1 ( newLayer $ Pitch ANat 4 )
+  let layers = M.singleton 1 ( newLayer . SSPitch $ Pitch ANat 4 )
       tempo = 120
       vol = 10
 
@@ -27,6 +27,7 @@ main = do
   volumeRef         <- newIORef vol
   elapsedSamplesRef <- newIORef 0
   semaphore         <- newSemaphore
+  wavs              <- loadWavFiles
 
   SDL.initialize [SDL.InitAudio]
   (audioDevice, _audioSpec)
@@ -36,6 +37,7 @@ main = do
 
   let startPlayback = SDL.setAudioDevicePlaybackState audioDevice SDL.Play
       stopPlayback = SDL.setAudioDevicePlaybackState audioDevice SDL.Pause
+      finalizer = SDL.closeAudioDevice audioDevice >> SDL.quit
 
       initState = JamState { _jamStLayersRef      = layerRef
                            , _jamStTempoRef       = tempoRef
@@ -44,13 +46,15 @@ main = do
                            , _jamStSemaphore      = semaphore
                            , _jamStStartPlayback  = startPlayback
                            , _jamStStopPlayback   = stopPlayback
+                           , _jamStWavSources     = wavs
+                           , _jamStFinalizer      = finalizer
                            }
 
   let css = $(embedFile "../app/css/styles.css")
 
       -- JSaddle currently does nothing with the appdelegate handlers. Hopefully it will in the future.
       appDelegateConfig =
-        def { WebView._appDelegateConfig_applicationWillTerminate = SDL.closeAudioDevice audioDevice >> SDL.quit
+        def { WebView._appDelegateConfig_applicationWillTerminate = finalizer
             }
 
   WebView.runWithAppConfig appDelegateConfig

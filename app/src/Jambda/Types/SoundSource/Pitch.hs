@@ -1,4 +1,4 @@
-module Jambda.Types.Pitch
+module Jambda.Types.SoundSource.Pitch
   ( Pitch(..)
   , Note(..)
   , pitchText

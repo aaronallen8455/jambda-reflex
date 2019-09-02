@@ -1,0 +1,5 @@
+*.wav
+app/dist/build/
+dist-newstyle/
+dist/
+.ghc*

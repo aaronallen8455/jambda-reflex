@@ -13,9 +13,10 @@ import           Control.Monad.IO.Class (MonadIO)
 import           Reflex
 import           Reflex.Dom
 
-import           Jambda.Types.Pitch (Pitch)
+import           Jambda.Types.SoundSource (SoundSource(..))
+import           Jambda.Types.SoundSource.Pitch (Pitch(..), Note(..))
 
-type JambdaUI t m = (MonadHold t m, MonadFix m, DomBuilder t m, PerformEvent t m, MonadIO (Performable m))
+type JambdaUI t m = (MonadHold t m, MonadFix m, DomBuilder t m, PerformEvent t m, PostBuild t m, MonadIO (Performable m))
 
 data LayerEvent
   = NewLayer Int LayerUI
@@ -24,18 +25,24 @@ data LayerEvent
 
 data LayerUI =
   LayerUI
-    { _layerUIBeatCode :: InputState T.Text
-    , _layerUIOffset :: InputState T.Text
-    , _layerUIPitch :: InputState Pitch
+    { _layerUIBeatCode    :: InputState T.Text -- ^ Holds state for the beatcode input
+    , _layerUIOffset      :: InputState T.Text -- ^ State of offset input
+    , _layerUISoundSource :: SoundSource -- ^ The current SoundSource
+    , _layerUIPitch       :: InputState Pitch -- ^ Holds the state of the pitch input
     }
 
-mkNewLayerUI :: T.Text -> T.Text -> Pitch -> LayerUI
-mkNewLayerUI beat offset pitch =
+mkNewLayerUI :: T.Text -> T.Text -> SoundSource -> LayerUI
+mkNewLayerUI beat offset soundSource =
   LayerUI
-    { _layerUIBeatCode = InputState beat Nothing
-    , _layerUIOffset   = InputState offset Nothing
-    , _layerUIPitch    = InputState pitch Nothing
+    { _layerUIBeatCode    = InputState beat Nothing
+    , _layerUIOffset      = InputState offset Nothing
+    , _layerUISoundSource = soundSource
+    , _layerUIPitch       = InputState pitch Nothing
     }
+    where
+      pitch = case soundSource of
+                SSPitch p -> p
+                _ -> Pitch ANat 4
 
 data InputState a =
   InputState
