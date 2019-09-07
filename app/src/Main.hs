@@ -4,6 +4,7 @@ module Main where
 
 import           Data.Default.Class (def)
 import           Data.FileEmbed (embedFile)
+import           Data.Foldable (traverse_)
 import qualified Data.IntMap as M
 import           Data.IORef
 import qualified Data.Vector.Storable.Mutable as MV
@@ -11,6 +12,7 @@ import qualified Data.Vector.Storable.Mutable as MV
 import qualified Language.Javascript.JSaddle.WKWebView as WebView
 import qualified Reflex.Dom.Main as Main
 import qualified SDL
+import qualified SDL.Raw.Audio as RawSDL
 
 import           Jambda.Data
 import           Jambda.Types
@@ -37,7 +39,9 @@ main = do
 
   let startPlayback = SDL.setAudioDevicePlaybackState audioDevice SDL.Play
       stopPlayback = SDL.setAudioDevicePlaybackState audioDevice SDL.Pause
-      finalizer = SDL.closeAudioDevice audioDevice >> SDL.quit
+      finalizer = do SDL.closeAudioDevice audioDevice
+                     SDL.quit
+                     traverse_ (RawSDL.freeWAV . _wavPtr) wavs
 
       initState = JamState { _jamStLayersRef      = layerRef
                            , _jamStTempoRef       = tempoRef

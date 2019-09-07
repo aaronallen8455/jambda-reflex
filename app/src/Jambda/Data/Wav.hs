@@ -23,14 +23,15 @@ loadWavFiles :: IO (V.Vector Wav)
 loadWavFiles = traverse mkWav wavFiles
   where
     mkWav (fp, label, hh) = do
-      samples <- loadWavFile fp
+      (samples, ptr) <- loadWavFile fp
       pure Wav { _wavLabel   = label
                , _wavSamples = V.toList samples
                , _wavHighHat = hh
+               , _wavPtr = ptr
                }
 
 -- | Extract the samples from a wav file
-loadWavFile :: FilePath -> IO (V.Vector Sample)
+loadWavFile :: FilePath -> IO (V.Vector Sample, Ptr Word8)
 loadWavFile filePath = do
   -- Load the wav file into memory
   fpath        <- newCString filePath
@@ -49,7 +50,7 @@ loadWavFile filePath = do
                   (audioSpecChannels spec)
                   (audioSpecFreq spec)
                   SDL_AUDIO_F32SYS -- Native floating point
-                  2
+                  1
                   44100
 
   len          <- peek lenPtr
@@ -65,14 +66,15 @@ loadWavFile filePath = do
   throwIfNeg_ "loadWav" "convertAudio" $ convertAudio audioCVTPtr
 
   bufferFPtr <- newForeignPtr_ cvtBufferPtr
-  let samples = SV.unsafeCast
+  let samples = SV.convert
+              . SV.unsafeCast
               $ SV.unsafeFromForeignPtr0 bufferFPtr ( fromIntegral len )
 
+  finalizeForeignPtr bufferFPtr
   free audioCVTPtr
-  freeWAV cvtBufferPtr
   free bufferPtrPtr
   free lenPtr
   free specPtr
 
-  pure $ SV.convert samples
+  pure (samples, cvtBufferPtr)
 

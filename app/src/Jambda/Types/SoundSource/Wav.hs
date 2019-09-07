@@ -4,6 +4,8 @@ module Jambda.Types.SoundSource.Wav where
 import           Control.Lens
 import qualified Data.Text as T
 import qualified Data.Vector as V
+import           Data.Word (Word8)
+import           Foreign.Ptr (Ptr)
 
 import           Jambda.Types.Newtypes (Sample)
 
@@ -12,6 +14,7 @@ data Wav =
     { _wavLabel   :: !T.Text
     , _wavSamples  :: ![Sample]
     , _wavHighHat :: !(Maybe HighHatStatus)
+    , _wavPtr :: !(Ptr Word8)
     }
 
 data HighHatStatus
