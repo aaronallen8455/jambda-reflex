@@ -22,7 +22,9 @@ mkSourceInput :: JambdaUI t m
               => JamState -> Int -> LayerUI -> m (Event t LayerEvent)
 mkSourceInput st layerId layerUI = do
   let sourceMap = pure . M.fromList $ ( SSPitch $ layerUI^.layerUIPitch.inpValid, "Pitch" )
-                : map ( SSWav &&& _wavLabel ) ( V.toList $ _jamStWavSources st )
+                : map ( SSWav &&& mkWavLabel )
+                      ( V.toList  $ _jamStWavSources st )
+      mkWavLabel w = ( T.pack . show $ _wavIdx w + 1 ) <> ". " <> _wavLabel w
 
   sourceSelect <- dropdown ( layerUI^.layerUISoundSource ) sourceMap def
   let sourceSelectDyn = _dropdown_value sourceSelect

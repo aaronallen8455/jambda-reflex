@@ -21,6 +21,6 @@ instance Ord SoundSource where
   compare (SSPitch p1) (SSPitch p2) = compare p1 p2
   compare (SSPitch _) _ = LT
   compare _ (SSPitch _) = GT
-  compare (SSWav w1) (SSWav w2) = ( compare `on` _wavLabel ) w1 w2
+  compare (SSWav w1) (SSWav w2) = ( compare `on` _wavIdx ) w1 w2
 
 makePrisms ''SoundSource

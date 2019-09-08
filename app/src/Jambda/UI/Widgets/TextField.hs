@@ -53,8 +53,11 @@ textFieldInput "" inpState validator mkSetValEv = do
                                       ]
                        ]
 
-    let validate v    = maybe (Left v) Right $ validator v
-        eitherValEv   = validate <$> valueEv
+    let validate v
+          | Just v == _inpInvalid inpState = Nothing
+          | _inpInvalid inpState == Nothing && v == _inpValid inpState = Nothing
+          | otherwise = Just $ maybe (Left v) Right $ validator v
+        eitherValEv   = fmapMaybe id $ validate <$> valueEv
         invalidAttrEv = ffor eitherValEv $ either (const invalidAttrs)
                                                   (const validAttrs)
         editingAttrEv = editingAttrs <$ editingEv

@@ -3,6 +3,7 @@ module Jambda.Data.Wav
   , loadWavFile
   ) where
 
+import           Control.Lens (itraverse)
 import qualified Data.Vector as V
 import qualified Data.Vector.Storable as SV
 import           Data.Word (Word8, Word32)
@@ -20,14 +21,15 @@ import           SDL.Raw.Types
 import           Jambda.Types
 
 loadWavFiles :: IO (V.Vector Wav)
-loadWavFiles = traverse mkWav wavFiles
+loadWavFiles = itraverse mkWav wavFiles
   where
-    mkWav (fp, label, hh) = do
+    mkWav i (fp, label, hh) = do
       (samples, ptr) <- loadWavFile fp
       pure Wav { _wavLabel   = label
                , _wavSamples = V.toList samples
                , _wavHighHat = hh
                , _wavPtr = ptr
+               , _wavIdx = i
                }
 
 -- | Extract the samples from a wav file

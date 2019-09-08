@@ -20,17 +20,16 @@ import           Jambda.UI.Widgets
 rootWidget :: (JambdaUI t m, PostBuild t m) => JamState -> m ()
 rootWidget st = el "div" $ do
   rec
-    newLayerIdDyn <- holdDyn 1 $ maybe 1 (succ . fst) . M.lookupMax
-                             <$> current layerMapDyn <@ newLayerEv
+    newLayerIdB <- hold 1 $ maybe 1 (succ . fst) . M.lookupMax
+                          <$> current layerMapDyn <@ newLayerEv
 
-    randomNoteEv <- performEvent $ generateRandomNote <$ newLayerEv
+    randomNoteEv <- fmap SSPitch <$> ( performEvent $ generateRandomNote <$ newLayerEv )
 
-    newLayerNoteDyn <- fmap SSPitch <$> holdDyn ( Pitch ANat 4 ) randomNoteEv
-    let newLayerEventDyn = NewLayer
-                       <$> newLayerIdDyn
-                       <*> ( mkNewLayerUI "1" "0" <$> newLayerNoteDyn )
+    let newLayerEvent = NewLayer
+                       <$> newLayerIdB
+                       <@> ( mkNewLayerUI "1" "0" <$> randomNoteEv )
 
-        layerEvents = leftmost [ updated newLayerEventDyn, editLayerEvents ]
+        layerEvents = leftmost [ newLayerEvent, editLayerEvents ]
         initLayerMap = M.singleton 1 ( mkNewLayerUI "1" "0" ( SSPitch $ Pitch ANat 4 ) )
 
     layerMapDyn <- foldDyn applyLayerEvent initLayerMap layerEvents
@@ -50,8 +49,8 @@ rootWidget st = el "div" $ do
     newLayerEv <- button "New Layer"
 
     -- Adds a new layer to the backend
-    performEvent_ $ createNewLayer st <$> current newLayerIdDyn
-                                      <@> updated newLayerNoteDyn
+    performEvent_ $ createNewLayer st <$> newLayerIdB
+                                      <@> randomNoteEv
 
     playbackStateDyn <- accum (const id)
                               Stopped

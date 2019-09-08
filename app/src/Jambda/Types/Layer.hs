@@ -13,8 +13,7 @@ import            Jambda.Types.Cell (Cell')
 
 data Layer =
   Layer
-    { _layerSamples      :: ![Sample]           -- ^ The sound to play
-    , _layerBeat         :: !(Stream Cell')     -- ^ Infinite list of cells
+    { _layerBeat         :: !(Stream Cell')     -- ^ Infinite list of cells
     , _layerParsedCode   :: !(NonEmpty Cell')   -- ^ The parsed beatcode, finite list
     , _layerCellOffset   :: !CellValue          -- ^ Initial delay before first note
     , _layerCellPrefix   :: !CellValue          -- ^ Cell value before next note

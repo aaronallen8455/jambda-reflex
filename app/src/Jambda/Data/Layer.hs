@@ -22,27 +22,20 @@ import           Data.List.NonEmpty (NonEmpty)
 
 import           Jambda.Data.Constants (taperLength)
 import           Jambda.Data.Conversions (numSamplesForCellValue, numSamplesToCellValue)
-import           Jambda.Data.Stream (dovetail, linearTaper, silence, sineWave)
+import           Jambda.Data.Stream (dovetail, linearTaper, silence)
 import           Jambda.Types
 
 -- | Create a new layer with the given Pitch using defaults
 -- for all other fields
 newLayer :: SoundSource -> Layer
 newLayer soundSource = Layer
-  { _layerSamples = source
-  , _layerBeat = pure ( Cell 1 Nothing )
+  { _layerBeat = pure ( Cell 1 Nothing )
   , _layerParsedCode = [ Cell 1 Nothing ]
   , _layerCellOffset = 0
   , _layerCellPrefix = 0
   , _layerSamplePrefix = []
   , _layerSoundSource = soundSource
   }
-    where
-      source = case soundSource of
-                 SSPitch pitch ->
-                   let freq = pitchToFreq pitch
-                    in linearTaper taperLength $ sineWave freq 0
-                 SSWav wav -> wav^.wavSamples
 
 -- | Progress a layer by the given number of samples
 -- returning the resulting samples and the modified layer.
@@ -171,16 +164,7 @@ syncLayer elapsedCells layer
 
 -- | Change the sound source (Pitch) of the layer
 modifySource :: SoundSource -> Layer -> Layer
-modifySource soundSource layer =
-  let samples = case soundSource of
-                  SSPitch pitch ->
-                    let freq = pitchToFreq pitch
-                        wave = sineWave freq 0
-                     in linearTaper taperLength wave
-                  SSWav wav -> wav^.wavSamples
-
-   in layer & layerSamples     .~ samples
-            & layerSoundSource .~ soundSource
+modifySource soundSource layer = layer & layerSoundSource .~ soundSource
 
 -- | Reset a layer to it's initial state
 resetLayer :: Layer -> Layer
