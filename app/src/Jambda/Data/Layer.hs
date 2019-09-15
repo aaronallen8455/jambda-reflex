@@ -11,6 +11,8 @@ module Jambda.Data.Layer
   , applyLayerBeatChange
   , applyLayerOffsetChange
   , applyLayerSourceChange
+  , applyLayerVolChange
+  , applyLayerPanChange
   ) where
 
 import           Control.Lens hiding ((:>))
@@ -28,14 +30,17 @@ import           Jambda.Types
 -- | Create a new layer with the given Pitch using defaults
 -- for all other fields
 newLayer :: SoundSource -> Layer
-newLayer soundSource = Layer
-  { _layerBeat = pure ( Cell 1 Nothing )
-  , _layerParsedCode = [ Cell 1 Nothing ]
-  , _layerCellOffset = 0
-  , _layerCellPrefix = 0
-  , _layerSamplePrefix = []
-  , _layerSoundSource = soundSource
-  }
+newLayer soundSource =
+  Layer
+    { _layerBeat         = pure ( Cell 1 Nothing )
+    , _layerParsedCode   = [ Cell 1 Nothing ]
+    , _layerCellOffset   = 0
+    , _layerCellPrefix   = 0
+    , _layerSamplePrefix = []
+    , _layerSoundSource  = soundSource
+    , _layerVol          = 1
+    , _layerPan          = 0
+    }
 
 -- | Progress a layer by the given number of samples
 -- returning the resulting samples and the modified layer.
@@ -125,22 +130,27 @@ applyLayerBeatChange st allParsedCells = do
                    allParsedCells
 
 -- | Apply the current contents of the offset field of a layer
-applyLayerOffsetChange :: JamState
-                       -> Int
-                       -> CellValue
-                       -> IO ()
+applyLayerOffsetChange :: JamState -> Int -> CellValue -> IO ()
 applyLayerOffsetChange st i cellVal =
   modifyLayer st i ( layerCellOffset .~ cellVal )
 
 -- | Apply the contents of the source field to the layer
-applyLayerSourceChange :: JamState
-                       -> Int
-                       -> SoundSource
-                       -> IO ()
+applyLayerSourceChange :: JamState -> Int -> SoundSource -> IO ()
 applyLayerSourceChange st i src =
-  modifyIORef' ( st^.jamStLayersRef ) $ \layers ->
-    let mbLayer = modifySource src <$> layers ^? ix i
-     in maybe layers ( \x -> layers & ix i .~ x ) mbLayer
+  modifyIORef' ( st^.jamStLayersRef ) $
+    ix i . layerSoundSource .~ src
+
+applyLayerVolChange :: JamState -> Int -> Float -> IO ()
+applyLayerVolChange st i vol =
+  modifyIORef' ( st^.jamStLayersRef ) $
+    ix i . layerVol .~ vol'
+  where vol' = min 1 $ max 0 vol
+
+applyLayerPanChange :: JamState -> Int -> Float -> IO ()
+applyLayerPanChange st i pan =
+  modifyIORef' ( st^.jamStLayersRef ) $
+    ix i . layerPan .~ pan'
+      where pan' = max (-1) $ min 1 pan
 
 -- | Fast-forward a layer to the current time position
 syncLayer :: CellValue -> Layer -> Layer
@@ -161,10 +171,6 @@ syncLayer elapsedCells layer
     dropCells !dc ( c :> cs )
       | c^.cellValue >= dc = ( c^.cellValue - dc, cs )
       | otherwise = dropCells ( dc - c^.cellValue ) cs
-
--- | Change the sound source (Pitch) of the layer
-modifySource :: SoundSource -> Layer -> Layer
-modifySource soundSource layer = layer & layerSoundSource .~ soundSource
 
 -- | Reset a layer to it's initial state
 resetLayer :: Layer -> Layer

@@ -19,6 +19,8 @@ data Layer =
     , _layerCellPrefix   :: !CellValue          -- ^ Cell value before next note
     , _layerSamplePrefix :: ![Sample]           -- ^ Tail of a partially played source
     , _layerSoundSource  :: !SoundSource        -- ^ The sound representation to use
+    , _layerVol          :: Float               -- ^ Volume coefficient of the layer
+    , _layerPan          :: Float               -- ^ Pan of the layer (-1 to 1)
     }
 
 makeLenses ''Layer

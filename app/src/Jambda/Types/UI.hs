@@ -3,6 +3,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE TypeFamilies #-}
 module Jambda.Types.UI where
 
 import qualified Data.Text as T
@@ -16,7 +17,7 @@ import           Reflex.Dom
 import           Jambda.Types.SoundSource (SoundSource(..))
 import           Jambda.Types.SoundSource.Pitch (Pitch(..), Note(..))
 
-type JambdaUI t m = (MonadHold t m, MonadFix m, DomBuilder t m, PerformEvent t m, PostBuild t m, MonadIO (Performable m))
+type JambdaUI t m = (MonadHold t m, MonadFix m, DomBuilder t m, PerformEvent t m, PostBuild t m, MonadIO (Performable m), DomBuilderSpace m ~ GhcjsDomSpace)
 
 data LayerEvent
   = NewLayer Int LayerUI
@@ -29,6 +30,8 @@ data LayerUI =
     , _layerUIOffset      :: InputState T.Text -- ^ State of offset input
     , _layerUISoundSource :: SoundSource -- ^ The current SoundSource
     , _layerUIPitch       :: InputState Pitch -- ^ Holds the state of the pitch input
+    , _layerUIVol         :: Float
+    , _layerUIPan         :: Float
     }
 
 mkNewLayerUI :: T.Text -> T.Text -> SoundSource -> LayerUI
@@ -38,6 +41,8 @@ mkNewLayerUI beat offset soundSource =
     , _layerUIOffset      = InputState offset Nothing
     , _layerUISoundSource = soundSource
     , _layerUIPitch       = InputState pitch Nothing
+    , _layerUIVol         = 1.0
+    , _layerUIPan         = 0.0
     }
     where
       pitch = case soundSource of

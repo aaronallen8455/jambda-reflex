@@ -29,7 +29,6 @@ executable Jambda
                , Jambda.Types.Cell
                , Jambda.Types.JamState
                , Jambda.Types.Layer
-               , Jambda.Types.Name
                , Jambda.Types.Newtypes
                , Jambda.Types.SoundSource
                , Jambda.Types.SoundSource.Pitch

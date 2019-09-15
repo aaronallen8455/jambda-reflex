@@ -4,17 +4,18 @@ module Jambda.Data.Audio
   , aggregateChunks
   ) where
 
-import Data.List (transpose)
-import qualified  Data.IntMap as Map
-import Data.IORef
+import           Control.Arrow ((&&&), (***))
+import           Control.Monad (join)
+import           Data.List (transpose)
+import qualified Data.IntMap as Map
+import           Data.IORef
 import qualified Data.Vector.Storable.Mutable as MV
 
+import           Control.Lens
 import qualified SDL
 
-import Control.Lens
-
-import Jambda.Types
-import Jambda.Data.Layer (readChunk)
+import           Jambda.Types
+import           Jambda.Data.Layer (readChunk)
 
 audioCallback :: Semaphore
               -> IORef ( Map.IntMap Layer )
@@ -33,14 +34,16 @@ audioCallback semaphore layersRef bpmRef elapsedSamplesRef volumeRef SDL.Floatin
 
   let numSamples = MV.length vec `div` 2                   :: Int
       chunkMap   = readChunk numSamples bpm <$> layers     :: Map.IntMap (Layer, [Sample])
-      samples    = map snd $ Map.elems chunkMap            :: [[Sample]]
+      lVol = uncurry $ volC L
+      rVol = uncurry $ volC R
+      samples    = uncurry zip . (lVol &&& rVol) <$> Map.elems chunkMap      :: [[(Sample, Sample)]]
       newLayers  = fst <$> chunkMap                        :: Map.IntMap Layer
-      combined   = map ( ( * ( vol / 10 ) ) . getSample )
-                 $ aggregateChunks samples
+      combined   = join bimap ( ( * ( vol / 10 ) ) . getSample )
+               <$> aggregateChunks samples
 
-  iforM_ combined $ \i s -> do
-    MV.write vec ( i * 2 ) s     -- Left channel
-    MV.write vec ( i * 2 + 1 ) s -- Right channel
+  iforM_ combined $ \i (l, r) -> do
+    MV.write vec ( i * 2 ) l     -- Left channel
+    MV.write vec ( i * 2 + 1 ) r -- Right channel
 
   writeIORef layersRef newLayers
   modifyIORef' elapsedSamplesRef ( + fromIntegral numSamples )
@@ -48,7 +51,16 @@ audioCallback semaphore layersRef bpmRef elapsedSamplesRef volumeRef SDL.Floatin
 audioCallback _ _ _ _ _ fmt _ =
   error $ "Unsupported sample encoding: " <> show fmt
 
-aggregateChunks :: [[Sample]] -> [Sample]
-aggregateChunks = map sum . transpose
+data Pan = L | R
 
+volC :: Pan -> Layer -> [Sample] -> [Sample]
+volC p layer samples =
+  let m = case p of
+            R -> 1
+            L -> -1
+      coef = (_layerPan layer * m + 1) * (_layerVol layer)
+   in map ( Sample . (* coef) . getSample ) samples
+
+aggregateChunks :: [[(Sample, Sample)]] -> [(Sample, Sample)]
+aggregateChunks = map ((sum *** sum) . unzip) . transpose
 

@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
 module Jambda.UI.Widgets.Layer
   ( layerWidget
   ) where
@@ -13,6 +14,7 @@ import           Reflex
 import           Reflex.Dom
 
 import           Jambda.Types
+import           Jambda.Data
 import           Jambda.UI.Widgets.Layer.BeatCode
 import           Jambda.UI.Widgets.Layer.Source
 import           Jambda.UI.Widgets.Layer.Offset
@@ -31,6 +33,26 @@ layerWidget st layerId layerUI layerMap = el "div" $ do
   -- Offset input
   changeOffsetEv <- mkOffsetInput st layerId layerUI
 
+  -- Vol. input
+  volInput <- rangeInput $ def & rangeInputConfig_initialValue .~ _layerUIVol layerUI
+                               & attributes .~ constDyn ("max" =: "1" <> "step" =: ".05")
+
+  let volEv = _rangeInput_input volInput
+      changeVolEv = fforMaybe volEv $ \v ->
+        if v /= _layerUIVol layerUI
+           then Just $ ChangeLayer layerId ( layerUI & layerUIVol .~ v )
+           else Nothing
+
+  performEvent_ $ liftIO . applyLayerVolChange st layerId <$> volEv
+
+  -- Pan input
+  panInput <- rangeInput $ def & rangeInputConfig_initialValue .~ _layerUIPan layerUI
+                               & attributes .~ constDyn ("max" =: "1" <> "min" =: "-1" <> "step" =: ".1")
+  let panEv = _rangeInput_input panInput
+      --changePanEv = ffor panEv $ \p -> ChangeLayer layerId ( layerUI & layerUIPan .~ p )
+
+  performEvent_ $ liftIO . applyLayerPanChange st layerId <$> panEv
+
   -- Delete button
   deleteEv <- ( RemoveLayer layerId <$ ) <$> button "X"
   performEvent_ $ deleteLayer st layerId <$ deleteEv
@@ -39,6 +61,8 @@ layerWidget st layerId layerUI layerMap = el "div" $ do
                   , changeBeatCodeEv
                   , changeSourceEv
                   , changeOffsetEv
+                  --, changeVolEv
+                  --, changePanEv
                   ]
 
 deleteLayer :: MonadIO m => JamState -> Int -> m ()

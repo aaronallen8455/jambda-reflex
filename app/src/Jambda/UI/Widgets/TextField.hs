@@ -44,26 +44,28 @@ textFieldInput "" inpState validator mkSetValEv = do
         editingEv  = ffilter (not . flip elem [37, 38, 39, 40]) keydownEv
         blurEv     = domEvent Blur element'
         enterKeyEv = () <$ ffilter (== 13) keypressEv
-        valueEv    = leftmost
+        updateUIEv = ffilter filterNoOp
+                   . tagPromptlyDyn
+                         (_inputElement_value input)
+                         $ leftmost [ blurEv
+                                    , enterKeyEv
+                                    ]
+        valueEv    = validate <$> leftmost
                        [ setValEv
-                       , tagPromptlyDyn
-                           (_inputElement_value input)
-                           $ leftmost [ blurEv
-                                      , enterKeyEv
-                                      ]
+                       , updateUIEv
                        ]
 
-    let validate v
-          | Just v == _inpInvalid inpState = Nothing
-          | _inpInvalid inpState == Nothing && v == _inpValid inpState = Nothing
-          | otherwise = Just $ maybe (Left v) Right $ validator v
-        eitherValEv   = fmapMaybe id $ validate <$> valueEv
-        invalidAttrEv = ffor eitherValEv $ either (const invalidAttrs)
-                                                  (const validAttrs)
+    let filterNoOp v
+          | Just v == _inpInvalid inpState = False
+          | _inpInvalid inpState == Nothing && v == _inpValid inpState = False
+          | otherwise = True
+        validate v = maybe (Left v) Right $ validator v
+        invalidAttrEv = ffor valueEv $ either (const invalidAttrs)
+                                              (const validAttrs)
         editingAttrEv = editingAttrs <$ editingEv
         attrEv        = leftmost [invalidAttrEv, editingAttrEv]
 
-  pure eitherValEv
+  pure valueEv
 
 textFieldInput label inpState validator mkSetValEv =
   elClass "div" "input-wrapper" $ do

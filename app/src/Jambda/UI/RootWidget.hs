@@ -1,5 +1,6 @@
 {-# LANGUAGE RecursiveDo #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
 module Jambda.UI.RootWidget
   ( rootWidget
   ) where
@@ -18,71 +19,74 @@ import           Jambda.Types
 import           Jambda.UI.Widgets
 
 rootWidget :: (JambdaUI t m, PostBuild t m) => JamState -> m ()
-rootWidget st = el "div" $ do
-  rec
-    newLayerIdB <- hold 1 $ maybe 1 (succ . fst) . M.lookupMax
+rootWidget st = el "div" $ mdo
+  -- quit button
+  quitEvDyn <- widgetHold ( button "Quit" ) (pure never <$ quitEv)
+  quitEv <- sample $ current quitEvDyn
+
+  performEvent_ $ liftIO ( st^.jamStFinalizer ) <$ quitEv
+
+  _ <- flip widgetHold ( text "Have a nice day!" <$ quitEv ) $ do
+    rec
+      newLayerIdB <- hold 1 $ maybe 1 (succ . fst) . M.lookupMax
                           <$> current layerMapDyn <@ newLayerEv
 
-    randomNoteEv <- fmap SSPitch <$> ( performEvent $ generateRandomNote <$ newLayerEv )
+      randomNoteEv <- fmap SSPitch <$> ( performEvent $ generateRandomNote <$ newLayerEv )
 
-    let newLayerEvent = NewLayer
-                       <$> newLayerIdB
-                       <@> ( mkNewLayerUI "1" "0" <$> randomNoteEv )
+      let newLayerEvent = NewLayer
+                         <$> newLayerIdB
+                         <@> ( mkNewLayerUI "1" "0" <$> randomNoteEv )
 
-        layerEvents = leftmost [ newLayerEvent, editLayerEvents ]
-        initLayerMap = M.singleton 1 ( mkNewLayerUI "1" "0" ( SSPitch $ Pitch ANat 4 ) )
+          layerEvents = leftmost [ newLayerEvent, editLayerEvents ]
+          initLayerMap = M.singleton 1 ( mkNewLayerUI "1" "0" ( SSPitch $ Pitch ANat 4 ) )
 
-    layerMapDyn <- foldDyn applyLayerEvent initLayerMap layerEvents
+      layerMapDyn <- foldDyn applyLayerEvent initLayerMap layerEvents
 
-    let layerWidgetsDyn =
-          ( \m -> M.traverseWithKey ( \i layerUI -> layerWidget st i layerUI m ) m )
-            <$> layerMapDyn
+      let layerWidgetsDyn =
+            ( \m -> M.traverseWithKey ( \i layerUI -> layerWidget st i layerUI m ) m )
+              <$> layerMapDyn
 
-    -- quit button
-    quitEv <- button "Quit"
-    performEvent_ $ liftIO ( st^.jamStFinalizer ) <$ quitEv
+      -- create the layer widgets
+      editLayerEvents <- switchHold never . fmap (leftmost . M.elems)
+                     =<< dyn layerWidgetsDyn
 
-    -- create the layer widgets
-    editLayerEvents <- switchHold never . fmap (leftmost . M.elems)
-                   =<< dyn layerWidgetsDyn
+      newLayerEv <- button "New Layer"
 
-    newLayerEv <- button "New Layer"
+      -- Adds a new layer to the backend
+      performEvent_ $ createNewLayer st <$> newLayerIdB
+                                        <@> randomNoteEv
 
-    -- Adds a new layer to the backend
-    performEvent_ $ createNewLayer st <$> newLayerIdB
-                                      <@> randomNoteEv
+      playbackStateDyn <- accum (const id)
+                                Stopped
+                                (leftmost [startEv, stopEv, pauseEv])
 
-    playbackStateDyn <- accum (const id)
-                              Stopped
-                              (leftmost [startEv, stopEv, pauseEv])
+      let canPlayDyn  = fmap (/= Playing) playbackStateDyn
+          canStopDyn  = fmap (/= Stopped) playbackStateDyn
+          canPauseDyn = fmap (== Playing) playbackStateDyn
 
-    let canPlayDyn  = fmap (/= Playing) playbackStateDyn
-        canStopDyn  = fmap (/= Stopped) playbackStateDyn
-        canPauseDyn = fmap (== Playing) playbackStateDyn
+      startEv <- (Playing <$) <$> toggleButton canPlayDyn "Start"
+      performEvent_ $ (liftIO $ st^.jamStStartPlayback) <$ startEv
 
-    startEv <- (Playing <$) <$> toggleButton canPlayDyn "Start"
-    performEvent_ $ (liftIO $ st^.jamStStartPlayback) <$ startEv
+      let stopAction = liftIO $ do
+            st^.jamStStopPlayback
+            writeIORef ( st^.jamStElapsedSamples ) 0
+            modifyIORef' ( st^.jamStLayersRef ) ( fmap resetLayer )
 
-    let stopAction = liftIO $ do
-          st^.jamStStopPlayback
-          writeIORef ( st^.jamStElapsedSamples ) 0
-          modifyIORef' ( st^.jamStLayersRef ) ( fmap resetLayer )
+      stopEv <- (Stopped <$) <$> toggleButton canStopDyn "Stop"
+      performEvent_ $ stopAction <$ stopEv
 
-    stopEv <- (Stopped <$) <$> toggleButton canStopDyn "Stop"
-    performEvent_ $ stopAction <$ stopEv
+      pauseEv <- (Paused <$) <$> toggleButton canPauseDyn "Pause"
+      performEvent_ $ (liftIO $ st^.jamStStopPlayback) <$ pauseEv
 
-    pauseEv <- (Paused <$) <$> toggleButton canPauseDyn "Pause"
-    performEvent_ $ (liftIO $ st^.jamStStopPlayback) <$ pauseEv
+    -- tempo
+    text "Tempo: "
+    tempoDyn <- numberInput "Tempo" (120.0 :: BPM) parseBpm bpmToText 1
+    performEvent_ $ changeTempo st <$> updated tempoDyn
 
-  -- tempo
-  text "Tempo: "
-  tempoDyn <- numberInput "Tempo" (120.0 :: BPM) parseBpm bpmToText 1
-  performEvent_ $ changeTempo st <$> updated tempoDyn
-
-  -- volume
-  text "Vol.: "
-  volumeDyn <- numberInput "Volume" (5.0 :: Vol) parseVol volToText 0.2
-  performEvent_ $ changeVol st <$> updated volumeDyn
+    -- volume
+    text "Vol.: "
+    volumeDyn <- numberInput "Volume" (5.0 :: Vol) parseVol volToText 0.2
+    performEvent_ $ changeVol st <$> updated volumeDyn
 
   pure ()
 

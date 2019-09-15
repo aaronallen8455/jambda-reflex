@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
 module Jambda.UI.Widgets.Layer.BeatCode
   ( mkBeatCodeInput
   ) where

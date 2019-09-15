@@ -22,10 +22,10 @@ numberInput :: (MonadHold t m, MonadFix m, DomBuilder t m, Num r)
 numberInput label initialVal validator toText delta = do
   rec
     let s ev =
-          let upArrowEv   = ( + delta ) <$ ffilter ( == ( 38 :: Word ) ) ev
-              downArrowEv = ( subtract delta ) <$ ffilter ( == ( 40 :: Word ) ) ev
+          let upArrowEv    = ( + delta ) <$ ffilter ( == ( 38 :: Word ) ) ev
+              downArrowEv  = ( subtract delta ) <$ ffilter ( == ( 40 :: Word ) ) ev
               setVal cur f = toText <$> ( validator . toText ) new
-                where new = f cur
+                where new  = f cur
            in fmapMaybe id $ setVal <$> current inputDyn
                                     <@> leftmost [upArrowEv, downArrowEv]
 
