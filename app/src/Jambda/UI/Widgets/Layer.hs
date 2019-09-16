@@ -37,19 +37,16 @@ layerWidget st layerId layerUI layerMap = el "div" $ do
   volInput <- rangeInput $ def & rangeInputConfig_initialValue .~ _layerUIVol layerUI
                                & attributes .~ constDyn ("max" =: "1" <> "step" =: ".05")
 
-  let volEv = _rangeInput_input volInput
-      changeVolEv = fforMaybe volEv $ \v ->
-        if v /= _layerUIVol layerUI
-           then Just $ ChangeLayer layerId ( layerUI & layerUIVol .~ v )
-           else Nothing
+  let volEv = current (_rangeInput_value volInput) <@ _rangeInput_mouseup volInput
+      changeVolEv = ffor volEv $ \v -> ChangeLayer layerId ( layerUI & layerUIVol .~ v )
 
   performEvent_ $ liftIO . applyLayerVolChange st layerId <$> volEv
 
   -- Pan input
   panInput <- rangeInput $ def & rangeInputConfig_initialValue .~ _layerUIPan layerUI
                                & attributes .~ constDyn ("max" =: "1" <> "min" =: "-1" <> "step" =: ".1")
-  let panEv = _rangeInput_input panInput
-      --changePanEv = ffor panEv $ \p -> ChangeLayer layerId ( layerUI & layerUIPan .~ p )
+  let panEv = current (_rangeInput_value panInput) <@ _rangeInput_mouseup panInput
+      changePanEv = ffor panEv $ \p -> ChangeLayer layerId ( layerUI & layerUIPan .~ p )
 
   performEvent_ $ liftIO . applyLayerPanChange st layerId <$> panEv
 
@@ -61,8 +58,8 @@ layerWidget st layerId layerUI layerMap = el "div" $ do
                   , changeBeatCodeEv
                   , changeSourceEv
                   , changeOffsetEv
-                  --, changeVolEv
-                  --, changePanEv
+                  , changeVolEv
+                  , changePanEv
                   ]
 
 deleteLayer :: MonadIO m => JamState -> Int -> m ()
