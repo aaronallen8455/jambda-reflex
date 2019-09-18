@@ -21,7 +21,8 @@ mkOffsetInput st layerId layerUI = do
         offset <- parseOffset t
         pure (offset, t)
 
-  offsetInput <- textFieldInput "Offset"
+  offsetInput <- textFieldInput (Just "Offset")
+                                (Just "offset-input")
                                 (_layerUIOffset layerUI)
                                 validateOffset
                                 (const never)

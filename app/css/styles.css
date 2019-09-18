@@ -20,3 +20,21 @@ input {
   text-transform: uppercase;
   font-size: .4em;
 }
+
+.pitch-input {
+  width: 30px;
+  margin-right: 2px;
+}
+
+.offset-input {
+  width: 60px;
+}
+
+.volume-input {
+  width: 30px;
+}
+
+.tempo-input {
+  width: 45px;
+  margin-right: 2px;
+}

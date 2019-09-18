@@ -40,15 +40,16 @@ layerWidget st layerId layerUI layerMap = el "div" $ do
   let volEv = current (_rangeInput_value volInput) <@ _rangeInput_mouseup volInput
       changeVolEv = ffor volEv $ \v -> ChangeLayer layerId ( layerUI & layerUIVol .~ v )
 
-  performEvent_ $ liftIO . applyLayerVolChange st layerId <$> volEv
+  performEvent_ $ liftIO . applyLayerVolChange st layerId <$> _rangeInput_input volInput
 
   -- Pan input
   panInput <- rangeInput $ def & rangeInputConfig_initialValue .~ _layerUIPan layerUI
                                & attributes .~ constDyn ("max" =: "1" <> "min" =: "-1" <> "step" =: ".1")
+
   let panEv = current (_rangeInput_value panInput) <@ _rangeInput_mouseup panInput
       changePanEv = ffor panEv $ \p -> ChangeLayer layerId ( layerUI & layerUIPan .~ p )
 
-  performEvent_ $ liftIO . applyLayerPanChange st layerId <$> panEv
+  performEvent_ $ liftIO . applyLayerPanChange st layerId <$> _rangeInput_input panInput
 
   -- Delete button
   deleteEv <- ( RemoveLayer layerId <$ ) <$> button "X"

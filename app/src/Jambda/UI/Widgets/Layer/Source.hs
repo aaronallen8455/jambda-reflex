@@ -56,7 +56,8 @@ mkSourceInput st layerId layerUI = do
 mkPitchInput :: JambdaUI t m
              => LayerUI -> m (Event t (Either T.Text Pitch))
 mkPitchInput layerUI = do
-  textFieldInput ""
+  textFieldInput Nothing
+                 (Just "pitch-input")
                  (pitchText <$> _layerUIPitch layerUI)
                  parsePitch
                  (const never)

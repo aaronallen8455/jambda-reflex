@@ -13,13 +13,14 @@ import           Jambda.Types
 import           Jambda.UI.Widgets.TextField (textFieldInput)
 
 numberInput :: (MonadHold t m, MonadFix m, DomBuilder t m, Num r)
-            => T.Text
+            => Maybe T.Text
+            -> Maybe T.Text
             -> r
             -> (T.Text -> Maybe r)
             -> (r -> T.Text)
             -> r
             -> m (Dynamic t r)
-numberInput label initialVal validator toText delta = do
+numberInput label class' initialVal validator toText delta = do
   rec
     let s ev =
           let upArrowEv    = ( + delta ) <$ ffilter ( == ( 38 :: Word ) ) ev
@@ -30,6 +31,7 @@ numberInput label initialVal validator toText delta = do
                                     <@> leftmost [upArrowEv, downArrowEv]
 
     input <- textFieldInput label
+                            class'
                             ( InputState (toText initialVal) Nothing )
                             validator
                             s

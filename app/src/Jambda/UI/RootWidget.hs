@@ -80,12 +80,22 @@ rootWidget st = el "div" $ mdo
 
     -- tempo
     text "Tempo: "
-    tempoDyn <- numberInput "Tempo" (120.0 :: BPM) parseBpm bpmToText 1
+    tempoDyn <- numberInput (Just "Tempo")
+                            (Just "tempo-input")
+                            (120.0 :: BPM)
+                            parseBpm
+                            bpmToText
+                            1
     performEvent_ $ changeTempo st <$> updated tempoDyn
 
     -- volume
     text "Vol.: "
-    volumeDyn <- numberInput "Volume" (5.0 :: Vol) parseVol volToText 0.2
+    volumeDyn <- numberInput (Just "Volume")
+                             (Just "volume-input")
+                             (5.0 :: Vol)
+                             parseVol
+                             volToText
+                             0.2
     performEvent_ $ changeVol st <$> updated volumeDyn
 
   pure ()

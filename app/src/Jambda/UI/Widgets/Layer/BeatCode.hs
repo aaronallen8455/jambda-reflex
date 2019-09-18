@@ -29,7 +29,8 @@ validateBeatCode layerMap wavs layerId t = do
 mkBeatCodeInput :: JambdaUI t m
                 => JamState -> M.IntMap LayerUI -> Int -> LayerUI -> m (Event t LayerEvent)
 mkBeatCodeInput st layerMap layerId layerUI = do
-  beatCodeInput <- textFieldInput "BeatCode"
+  beatCodeInput <- textFieldInput (Just "BeatCode")
+                                  (Just "beatcode-input")
                                   (_layerUIBeatCode layerUI)
                                   (validateBeatCode layerMap (_jamStWavSources st) layerId)
                                   (const never)

@@ -15,15 +15,16 @@ import           Jambda.Types
 -- | an input field that only updates its value on blur or pressing enter, and
 -- only if the text contents are successfully validated.
 textFieldInput :: (MonadHold t m, MonadFix m, DomBuilder t m)
-               => T.Text
+               => Maybe T.Text
+               -> Maybe T.Text
                -> InputState T.Text
                -> (T.Text -> Maybe a)
                -> (Event t Word -> Event t T.Text)
                -> m (Event t (Either T.Text a))
-textFieldInput "" inpState validator mkSetValEv = do
-  let invalidAttrs  = "class" =: Just "invalid-field"
-      editingAttrs  = "class" =: Just "edited-field"
-      validAttrs    = "class" =: Nothing
+textFieldInput Nothing class' inpState validator mkSetValEv = do
+  let invalidAttrs  = "class" =: (Just ("invalid-field") <> fmap (", " <>) class')
+      editingAttrs  = "class" =: (Just ("edited-field") <> fmap (", " <>) class')
+      validAttrs    = "class" =: class'
       (curText, curAttr) =
         case inpState of
           InputState _ (Just t) -> (t, fmap (maybe mempty id) invalidAttrs)
@@ -67,7 +68,7 @@ textFieldInput "" inpState validator mkSetValEv = do
 
   pure valueEv
 
-textFieldInput label inpState validator mkSetValEv =
+textFieldInput (Just label) class' inpState validator mkSetValEv =
   elClass "div" "input-wrapper" $ do
     elClass "label" "input-label" $ text label
-    textFieldInput "" inpState validator mkSetValEv
+    textFieldInput Nothing class' inpState validator mkSetValEv
