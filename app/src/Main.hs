@@ -73,7 +73,7 @@ openDeviceSpec callback = SDL.OpenDeviceSpec
     -- ^ The format of audio that will be sampled from the output buffer.
   , SDL.openDeviceChannels = SDL.Mandate SDL.Stereo
     -- ^ The amount of audio channels.
-  , SDL.openDeviceSamples = 1024
+  , SDL.openDeviceSamples = 256
     -- ^ Output audio buffer size in samples. This should be a power of 2.
   , SDL.openDeviceCallback = callback
     -- ^ A callback to invoke whenever new sample data is required. The callback

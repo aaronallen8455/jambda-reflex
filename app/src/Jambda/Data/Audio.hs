@@ -1,4 +1,5 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE Strict #-}
 module Jambda.Data.Audio
   ( audioCallback
   , aggregateChunks
@@ -32,12 +33,12 @@ audioCallback semaphore layersRef bpmRef elapsedSamplesRef volumeRef SDL.Floatin
   bpm <- readIORef bpmRef
   ( Vol vol ) <- readIORef volumeRef
 
-  let numSamples = MV.length vec `div` 2                   :: Int
-      chunkMap   = readChunk numSamples bpm <$> layers     :: Map.IntMap (Layer, [Sample])
+  let numSamples = MV.length vec `div` 2
+      chunkMap   = readChunk numSamples bpm <$> layers :: Map.IntMap (Layer, [Sample])
       lVol = uncurry $ volC L
       rVol = uncurry $ volC R
-      samples    = uncurry zip . (lVol &&& rVol) <$> Map.elems chunkMap      :: [[(Sample, Sample)]]
-      newLayers  = fst <$> chunkMap                        :: Map.IntMap Layer
+      samples    = uncurry zip . (lVol &&& rVol) <$> Map.elems chunkMap :: [[(Sample, Sample)]]
+      newLayers  = fst <$> chunkMap :: Map.IntMap Layer
       combined   = join bimap ( ( * ( vol / 10 ) ) . getSample )
                <$> aggregateChunks samples
 
@@ -51,15 +52,15 @@ audioCallback semaphore layersRef bpmRef elapsedSamplesRef volumeRef SDL.Floatin
 audioCallback _ _ _ _ _ fmt _ =
   error $ "Unsupported sample encoding: " <> show fmt
 
-data Pan = L | R
+data Channel= L | R
 
-volC :: Pan -> Layer -> [Sample] -> [Sample]
+volC :: Channel -> Layer -> [Sample] -> [Sample]
 volC p layer samples =
   let m = case p of
             R -> 1
             L -> -1
       coef = (_layerPan layer * m + 1) * (_layerVol layer)
-   in map ( Sample . (* coef) . getSample ) samples
+   in map ( Sample . ( coef * ) . getSample ) samples
 
 aggregateChunks :: [[(Sample, Sample)]] -> [(Sample, Sample)]
 aggregateChunks = map ((sum *** sum) . unzip) . transpose

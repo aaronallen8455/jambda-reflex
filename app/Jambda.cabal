@@ -62,6 +62,7 @@ executable Jambda
                      , sdl2
                      , streams
                      , text
+                     , unix-time
                      , transformers
                      , unix
                      , vector

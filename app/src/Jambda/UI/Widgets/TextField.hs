@@ -22,8 +22,8 @@ textFieldInput :: (MonadHold t m, MonadFix m, DomBuilder t m)
                -> (Event t Word -> Event t T.Text)
                -> m (Event t (Either T.Text a))
 textFieldInput Nothing class' inpState validator mkSetValEv = do
-  let invalidAttrs  = "class" =: (Just ("invalid-field") <> fmap (", " <>) class')
-      editingAttrs  = "class" =: (Just ("edited-field") <> fmap (", " <>) class')
+  let invalidAttrs  = "class" =: (Just ("invalid-field") <> fmap (" " <>) class')
+      editingAttrs  = "class" =: (Just ("edited-field") <> fmap (" " <>) class')
       validAttrs    = "class" =: class'
       (curText, curAttr) =
         case inpState of

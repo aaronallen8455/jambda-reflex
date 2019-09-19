@@ -6,10 +6,13 @@ module Jambda.UI.RootWidget
   ) where
 
 import           Control.Lens
-import           Control.Monad (void)
+import           Control.Monad (join, void)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import qualified Data.IntMap as M
 import           Data.IORef (writeIORef, modifyIORef', readIORef)
+import           Data.List.NonEmpty (NonEmpty(..))
+import           Data.UnixTime (UnixTime(..), getUnixTime)
+import           Foreign.C.Types (CTime(..))
 import           Reflex
 import           Reflex.Dom
 import           System.Random (randomIO)
@@ -78,15 +81,33 @@ rootWidget st = el "div" $ mdo
       pauseEv <- (Paused <$) <$> toggleButton canPauseDyn "Pause"
       performEvent_ $ (liftIO $ st^.jamStStopPlayback) <$ pauseEv
 
-    -- tempo
-    text "Tempo: "
-    tempoDyn <- numberInput (Just "Tempo")
-                            (Just "tempo-input")
-                            (120.0 :: BPM)
-                            parseBpm
-                            bpmToText
-                            1
-    performEvent_ $ changeTempo st <$> updated tempoDyn
+-- TODO move tempo input into module
+      -- tempo
+      text "Tempo: "
+      let initTempoWidget =
+            numberInput (Just "Tempo")
+                        (Just "tempo-input")
+                        120
+                        parseBpm
+                        bpmToText
+                        1
+
+      tempoDyn <- fmap join . widgetHold initTempoWidget
+                            . ffor tempoTapBpmEv $ \bpm ->
+        numberInput (Just "Tempo")
+                    (Just "tempo-input")
+                    bpm
+                    parseBpm
+                    bpmToText
+                    1
+
+      performEvent_ $ changeTempo st <$> leftmost [updated tempoDyn, tempoTapBpmEv]
+      tempoTapEv <- button "Tap"
+      timeEv <- performEvent $ (pure . unixTimeToSecs =<< liftIO getUnixTime)
+                                 <$ tempoTapEv
+      tempoTapBpm <- fmap (fmap secToBPM . tempoTapAvg)
+                 <$> foldDyn buildTimeList (pure 0) timeEv
+      let tempoTapBpmEv = fmapMaybe id $ updated tempoTapBpm
 
     -- volume
     text "Vol.: "
@@ -99,6 +120,22 @@ rootWidget st = el "div" $ mdo
     performEvent_ $ changeVol st <$> updated volumeDyn
 
   pure ()
+
+cTimeToSecs :: CTime -> Int
+cTimeToSecs (CTime x) = fromIntegral x
+
+unixTimeToSecs :: UnixTime -> Double
+unixTimeToSecs ut = (fromIntegral . cTimeToSecs $ utSeconds ut) + (fromIntegral (utMicroSeconds ut) / 1000000)
+
+buildTimeList :: Double -> NonEmpty Double -> NonEmpty Double
+buildTimeList x (h :| xs)
+  | x - h >= 2 = pure x
+  | otherwise  = x :| take 6 (h : xs)
+
+tempoTapAvg :: NonEmpty Double -> Maybe Sec
+tempoTapAvg (_ :| []) = Nothing
+tempoTapAvg (h :| xs) = Just . Sec . (/ fromIntegral (length xs)) . sum
+                      $ zipWith (-) (h:xs) xs
 
 applyLayerEvent :: LayerEvent -> M.IntMap LayerUI -> M.IntMap LayerUI
 applyLayerEvent (NewLayer i l) = M.insert i l

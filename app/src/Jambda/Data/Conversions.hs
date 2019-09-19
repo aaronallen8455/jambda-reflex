@@ -5,6 +5,7 @@ module Jambda.Data.Conversions
   , secToCellValue
   , numSampsToSecs
   , secToNumSamps
+  , secToBPM
   ) where
 
 import Jambda.Types
@@ -34,3 +35,6 @@ numSampsToSecs nsamps = Sec $
 
 secToNumSamps :: Sec -> Double
 secToNumSamps (Sec sec) = sec * sampleRate
+
+secToBPM :: Sec -> BPM
+secToBPM (Sec s) = BPM $! 60 / s
