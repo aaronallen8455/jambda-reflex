@@ -30,10 +30,10 @@ executable Jambda
                , Jambda.Types.JamState
                , Jambda.Types.Layer
                , Jambda.Types.Newtypes
+               , Jambda.Types.Semaphore
                , Jambda.Types.SoundSource
                , Jambda.Types.SoundSource.Pitch
                , Jambda.Types.SoundSource.Wav
-               , Jambda.Types.Semaphore
                , Jambda.Types.UI
                , Jambda.UI
                , Jambda.UI.RootWidget
@@ -42,9 +42,14 @@ executable Jambda
                , Jambda.UI.Widgets.Layer.BeatCode
                , Jambda.UI.Widgets.Layer.Offset
                , Jambda.UI.Widgets.Layer.Source
+               , Jambda.UI.Widgets.LayerList
+               , Jambda.UI.Widgets.NewLayer
                , Jambda.UI.Widgets.NumberInput
+               , Jambda.UI.Widgets.Tempo
                , Jambda.UI.Widgets.TextField
                , Jambda.UI.Widgets.ToggleButton
+               , Jambda.UI.Widgets.TransportControls
+               , Jambda.UI.Widgets.Volume
 
   -- other-extensions:
   build-depends:       base >=4.11 && <4.12
