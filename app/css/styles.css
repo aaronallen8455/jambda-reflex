@@ -3,6 +3,38 @@ input {
   color: white;
 }
 
+.layer-wrapper {
+  background-color: rgb(40, 209, 229);
+  border-radius: 5px;
+  margin: 2px;
+  padding: 5px;
+}
+
+.layer-wrapper:nth-of-type(odd) {
+  background-color: rgb(25, 230, 227);
+}
+
+.control-wrapper {
+  color: white;
+  padding: 5px;
+  background-color: gray;
+}
+
+.delete-layer {
+  display: inline-block;
+}
+
+.delete-layer button {
+  background: none;
+  border: none;
+}
+
+.delete-layer button:after {
+  font-size: 2em;
+  color: black;
+  content: "×"
+}
+
 .invalid-field {
   background-color: #7d0a0a;
 }

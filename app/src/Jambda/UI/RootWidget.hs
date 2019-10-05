@@ -22,14 +22,19 @@ rootWidget st = el "div" $ mdo
   performEvent_ $ liftIO ( st^.jamStFinalizer ) <$ quitEv
 
   _ <- flip widgetHold ( text "Have a nice day!" <$ quitEv ) $ mdo
-    layerIdxs <- layerListWidget st newLayerEvent
+    layerIdxs <- layerListWidget st newLayerEvent'
 
-    newLayerEvent <- newLayerWidget st layerIdxs
+    newLayerEvent' <- divClass "control-wrapper" $ do
+      newLayerEvent <- newLayerWidget st layerIdxs
 
-    transportControlsWidget st
+      transportControlsWidget st
 
-    tempoWidget st
+      tempoWidget st
 
-    volumeWidget st
+      volumeWidget st
+
+      pure newLayerEvent
+
+    pure ()
 
   pure ()

@@ -38,6 +38,7 @@ executable Jambda
                , Jambda.UI
                , Jambda.UI.RootWidget
                , Jambda.UI.Widgets
+               , Jambda.UI.Widgets.Label
                , Jambda.UI.Widgets.Layer
                , Jambda.UI.Widgets.Layer.BeatCode
                , Jambda.UI.Widgets.Layer.Offset

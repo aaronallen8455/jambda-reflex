@@ -18,10 +18,11 @@ import           Jambda.Data
 import           Jambda.UI.Widgets.Layer.BeatCode
 import           Jambda.UI.Widgets.Layer.Source
 import           Jambda.UI.Widgets.Layer.Offset
+import           Jambda.UI.Widgets.Label (label)
 
 layerWidget :: JambdaUI t m
             => JamState -> Int -> LayerUI -> M.IntMap LayerUI -> m (Event t LayerEvent)
-layerWidget st layerId layerUI layerMap = el "div" $ do
+layerWidget st layerId layerUI layerMap = divClass "layer-wrapper" $ do
   el "div" . text $ "Layer " <> (T.pack . show) layerId
 
   -- Beatcode input
@@ -34,7 +35,8 @@ layerWidget st layerId layerUI layerMap = el "div" $ do
   changeOffsetEv <- mkOffsetInput st layerId layerUI
 
   -- Vol. input
-  volInput <- rangeInput $ def & rangeInputConfig_initialValue .~ _layerUIVol layerUI
+  volInput <- label "Volume"
+            . rangeInput $ def & rangeInputConfig_initialValue .~ _layerUIVol layerUI
                                & attributes .~ constDyn ("max" =: "1" <> "step" =: ".05")
 
   let volEv = current (_rangeInput_value volInput) <@ _rangeInput_mouseup volInput
@@ -43,7 +45,8 @@ layerWidget st layerId layerUI layerMap = el "div" $ do
   performEvent_ $ liftIO . applyLayerVolChange st layerId <$> _rangeInput_input volInput
 
   -- Pan input
-  panInput <- rangeInput $ def & rangeInputConfig_initialValue .~ _layerUIPan layerUI
+  panInput <- label "Pan"
+            . rangeInput $ def & rangeInputConfig_initialValue .~ _layerUIPan layerUI
                                & attributes .~ constDyn ("max" =: "1" <> "min" =: "-1" <> "step" =: ".1")
 
   let panEv = current (_rangeInput_value panInput) <@ _rangeInput_mouseup panInput
@@ -52,7 +55,8 @@ layerWidget st layerId layerUI layerMap = el "div" $ do
   performEvent_ $ liftIO . applyLayerPanChange st layerId <$> _rangeInput_input panInput
 
   -- Delete button
-  deleteEv <- ( RemoveLayer layerId <$ ) <$> button "X"
+  deleteEv <- divClass "delete-layer"
+            $ ( RemoveLayer layerId <$ ) <$> button ""
   performEvent_ $ deleteLayer st layerId <$ deleteEv
 
   pure $ leftmost [ deleteEv

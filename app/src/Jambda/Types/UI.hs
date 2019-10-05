@@ -17,7 +17,14 @@ import           Reflex.Dom
 import           Jambda.Types.SoundSource (SoundSource(..))
 import           Jambda.Types.SoundSource.Pitch (Pitch(..), Note(..))
 
-type JambdaUI t m = (MonadHold t m, MonadFix m, DomBuilder t m, PerformEvent t m, PostBuild t m, MonadIO (Performable m), DomBuilderSpace m ~ GhcjsDomSpace)
+type JambdaUI t m = ( MonadHold t m
+                    , MonadFix m
+                    , DomBuilder t m
+                    , PerformEvent t m
+                    , PostBuild t m
+                    , MonadIO (Performable m)
+                    , DomBuilderSpace m ~ GhcjsDomSpace
+                    )
 
 data LayerEvent
   = NewLayer Int LayerUI

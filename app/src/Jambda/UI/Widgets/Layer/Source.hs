@@ -17,6 +17,7 @@ import           Reflex.Dom
 
 import           Jambda.Data (applyLayerSourceChange, parsePitch)
 import           Jambda.Types
+import           Jambda.UI.Widgets.Label (label)
 import           Jambda.UI.Widgets.TextField (textFieldInput)
 
 mkSourceInput :: JambdaUI t m
@@ -27,7 +28,8 @@ mkSourceInput st layerId layerUI = do
                       ( V.toList  $ _jamStWavSources st )
       mkWavLabel w = ( T.pack . show $ _wavIdx w + 1 ) <> ". " <> _wavLabel w
 
-  sourceSelect <- dropdown ( layerUI^.layerUISoundSource ) sourceMap def
+  sourceSelect <- label "Sound Source"
+                $ dropdown ( layerUI^.layerUISoundSource ) sourceMap def
   let sourceSelectDyn = _dropdown_value sourceSelect
 
   curSource <- sample $ current sourceSelectDyn
@@ -55,10 +57,11 @@ mkSourceInput st layerId layerUI = do
 
 mkPitchInput :: JambdaUI t m
              => LayerUI -> m (Event t (Either T.Text Pitch))
-mkPitchInput layerUI = do
-  textFieldInput Nothing
-                 (Just "pitch-input")
-                 (pitchText <$> _layerUIPitch layerUI)
-                 parsePitch
-                 (const never)
+mkPitchInput layerUI =
+  label "Note" $
+    textFieldInput Nothing
+                   (Just "pitch-input")
+                   (pitchText <$> _layerUIPitch layerUI)
+                   parsePitch
+                   (const never)
 

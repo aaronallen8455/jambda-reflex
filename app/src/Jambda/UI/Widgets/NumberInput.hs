@@ -1,18 +1,18 @@
 {-# LANGUAGE RecursiveDo #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
 module Jambda.UI.Widgets.NumberInput
   ( numberInput
   ) where
 
-import           Control.Monad.Fix (MonadFix)
 import qualified Data.Text as T
 
 import           Reflex
-import           Reflex.Dom
 
 import           Jambda.Types
 import           Jambda.UI.Widgets.TextField (textFieldInput)
 
-numberInput :: (MonadHold t m, MonadFix m, DomBuilder t m, Num r)
+numberInput :: (JambdaUI t m, Num r)
             => Maybe T.Text
             -> Maybe T.Text
             -> r

@@ -1,27 +1,29 @@
 {-# LANGUAGE RecursiveDo #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
 module Jambda.UI.Widgets.TextField
   ( textFieldInput
   ) where
 
 import           Control.Lens
-import           Control.Monad.Fix (MonadFix)
 import qualified Data.Text as T
 
 import           Reflex
 import           Reflex.Dom
 
 import           Jambda.Types
+import           Jambda.UI.Widgets.Label (label)
 
 -- | an input field that only updates its value on blur or pressing enter, and
 -- only if the text contents are successfully validated.
-textFieldInput :: (MonadHold t m, MonadFix m, DomBuilder t m)
+textFieldInput :: JambdaUI t m
                => Maybe T.Text
                -> Maybe T.Text
                -> InputState T.Text
                -> (T.Text -> Maybe a)
                -> (Event t Word -> Event t T.Text)
                -> m (Event t (Either T.Text a))
-textFieldInput Nothing class' inpState validator mkSetValEv = do
+textFieldInput mbLabel class' inpState validator mkSetValEv = do
   let invalidAttrs  = "class" =: (Just ("invalid-field") <> fmap (" " <>) class')
       editingAttrs  = "class" =: (Just ("edited-field") <> fmap (" " <>) class')
       validAttrs    = "class" =: class'
@@ -31,7 +33,7 @@ textFieldInput Nothing class' inpState validator mkSetValEv = do
           InputState t _        -> (t, fmap (maybe mempty id) validAttrs)
 
   rec
-    input <- inputElement $
+    input <- maybe id label mbLabel . inputElement $
       def & inputElementConfig_initialValue .~ curText
           & inputElementConfig_setValue .~ setValEv
           & inputElementConfig_elementConfig
@@ -67,8 +69,3 @@ textFieldInput Nothing class' inpState validator mkSetValEv = do
         attrEv        = leftmost [invalidAttrEv, editingAttrEv]
 
   pure valueEv
-
-textFieldInput (Just label) class' inpState validator mkSetValEv =
-  elClass "div" "input-wrapper" $ do
-    elClass "label" "input-label" $ text label
-    textFieldInput Nothing class' inpState validator mkSetValEv
