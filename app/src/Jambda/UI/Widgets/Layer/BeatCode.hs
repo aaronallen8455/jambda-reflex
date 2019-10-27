@@ -42,7 +42,6 @@ mkBeatCodeInput st layerMap layerId layerUI = do
   performEvent_ beatCodeEv
 
   pure . ffor beatCodeInput $ \case
-    Left inv        -> ChangeLayer layerId (layerUI & layerUIBeatCode . inpInvalid .~ Just inv)
-    Right (_, txt)  -> ChangeLayer layerId (layerUI & layerUIBeatCode . inpValid .~ txt
-                                                    & layerUIBeatCode . inpInvalid .~ Nothing
-                                           )
+    Left inv        -> ChangeLayer layerId ( layerUIBeatCode . inpInvalid .~ Just inv )
+    Right (_, txt)  -> ChangeLayer layerId $ ( layerUIBeatCode . inpValid .~ txt )
+                                           . ( layerUIBeatCode . inpInvalid .~ Nothing )

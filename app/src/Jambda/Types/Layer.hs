@@ -21,6 +21,8 @@ data Layer =
     , _layerSoundSource  :: !SoundSource        -- ^ The sound representation to use
     , _layerVol          :: Float               -- ^ Volume coefficient of the layer
     , _layerPan          :: Float               -- ^ Pan of the layer (-1 to 1)
+    , _layerMuted        :: Bool                -- ^ True if muted
+    , _layerSoloed       :: Bool                -- ^ True if part of the soloed group
     }
 
 makeLenses ''Layer

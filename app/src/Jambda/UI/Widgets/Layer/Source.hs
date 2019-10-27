@@ -44,14 +44,13 @@ mkSourceInput st layerId layerUI = do
   performEvent_ $ ffor srcEvents ( liftIO . applyLayerSourceChange st layerId )
 
   let pitchChangeEv = ffor pitchEv $ \case
-        Left inv -> ChangeLayer layerId ( layerUI & layerUIPitch . inpInvalid ?~ inv )
-        Right n  -> ChangeLayer layerId ( layerUI & layerUIPitch . inpValid .~ n
-                                                  & layerUIPitch . inpInvalid .~ Nothing
-                                                  & layerUISoundSource .~ SSPitch n
-                                        )
+        Left inv -> ChangeLayer layerId ( layerUIPitch . inpInvalid ?~ inv )
+        Right n  -> ChangeLayer layerId $ ( layerUIPitch . inpValid .~ n )
+                                        . ( layerUIPitch . inpInvalid .~ Nothing )
+                                        . ( layerUISoundSource .~ SSPitch n )
 
       sourceChangeEv = ffor ( updated sourceSelectDyn ) $ \x ->
-        ChangeLayer layerId ( layerUI & layerUISoundSource .~ x )
+        ChangeLayer layerId ( layerUISoundSource .~ x )
 
   pure $ leftmost [ pitchChangeEv, sourceChangeEv ]
 

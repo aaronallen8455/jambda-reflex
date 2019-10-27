@@ -36,10 +36,9 @@ mkOffsetInput st layerId layerUI = do
   pure . ffor offsetInput $ \case
     Left inv     -> ChangeLayer
                       layerId
-                      (layerUI & layerUIOffset . inpInvalid .~ Just inv)
+                      ( layerUIOffset . inpInvalid .~ Just inv )
     Right (_, t) -> ChangeLayer
                       layerId
-                      (layerUI & layerUIOffset . inpInvalid .~ Nothing
-                               & layerUIOffset . inpValid .~ t
-                      )
+                      $ ( layerUIOffset . inpInvalid .~ Nothing )
+                      . ( layerUIOffset . inpValid .~ t )
 

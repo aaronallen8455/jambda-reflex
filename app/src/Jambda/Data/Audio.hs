@@ -35,14 +35,22 @@ audioCallback semaphore layersRef bpmRef elapsedSamplesRef volumeRef SDL.Floatin
 
   let numSamples = MV.length vec `div` 2
       chunkMap   = readChunk numSamples bpm <$> layers :: Map.IntMap (Layer, [Sample])
+      chunkList  = Map.elems chunkMap
+      soloedLayers =
+        case filter (_layerSoloed . fst) $ chunkList of
+          soloed | not $ null soloed -> soloed
+          _                          -> chunkList
+      unmutedLayers = filter (not . _layerMuted . fst) soloedLayers
       lVol = uncurry $ volC L
       rVol = uncurry $ volC R
-      samples    = uncurry zip . (lVol &&& rVol) <$> Map.elems chunkMap :: [[(Sample, Sample)]]
+      samples    = uncurry zip . (lVol &&& rVol) <$> unmutedLayers :: [[(Sample, Sample)]]
       newLayers  = fst <$> chunkMap :: Map.IntMap Layer
       combined   = join bimap ( ( * ( vol / 10 ) ) . getSample )
                <$> aggregateChunks samples
+      combined' | null combined = join zip (replicate numSamples 0)
+                | otherwise = combined
 
-  iforM_ combined $ \i (l, r) -> do
+  iforM_ combined' $ \i (l, r) -> do
     MV.write vec ( i * 2 ) l     -- Left channel
     MV.write vec ( i * 2 + 1 ) r -- Right channel
 

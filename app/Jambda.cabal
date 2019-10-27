@@ -41,8 +41,11 @@ executable Jambda
                , Jambda.UI.Widgets.Label
                , Jambda.UI.Widgets.Layer
                , Jambda.UI.Widgets.Layer.BeatCode
+               , Jambda.UI.Widgets.Layer.Delete
+               , Jambda.UI.Widgets.Layer.Mute
                , Jambda.UI.Widgets.Layer.Offset
                , Jambda.UI.Widgets.Layer.Source
+               , Jambda.UI.Widgets.Layer.VolAndPan
                , Jambda.UI.Widgets.LayerList
                , Jambda.UI.Widgets.NewLayer
                , Jambda.UI.Widgets.NumberInput
@@ -79,5 +82,7 @@ executable Jambda
                -Wall
                -Wincomplete-uni-patterns
                -Wincomplete-record-updates
+               -Wmissing-fields
+               -Wmissing-methods
   default-extensions: OverloadedStrings
 

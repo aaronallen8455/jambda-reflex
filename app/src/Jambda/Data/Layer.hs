@@ -40,6 +40,8 @@ newLayer soundSource =
     , _layerSoundSource  = soundSource
     , _layerVol          = 1
     , _layerPan          = 0
+    , _layerMuted        = False
+    , _layerSoloed       = False
     }
 
 -- | Progress a layer by the given number of samples

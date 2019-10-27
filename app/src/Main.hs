@@ -2,15 +2,13 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Main where
 
-import           Data.Default.Class (def)
 import           Data.FileEmbed (embedFile)
 import           Data.Foldable (traverse_)
 import qualified Data.IntMap as M
 import           Data.IORef
 import qualified Data.Vector.Storable.Mutable as MV
 
-import qualified Language.Javascript.JSaddle.WKWebView as WebView
-import qualified Reflex.Dom.Main as Main
+import           Reflex.Dom
 import qualified SDL
 import qualified SDL.Raw.Audio as RawSDL
 
@@ -40,8 +38,9 @@ main = do
   let startPlayback = SDL.setAudioDevicePlaybackState audioDevice SDL.Play
       stopPlayback = SDL.setAudioDevicePlaybackState audioDevice SDL.Pause
       finalizer = do SDL.closeAudioDevice audioDevice
-                     SDL.quit
+                     --SDL.destroyWindow window
                      traverse_ (RawSDL.freeWAV . _wavPtr) wavs
+                     SDL.quit
 
       initState = JamState { _jamStLayersRef      = layerRef
                            , _jamStTempoRef       = tempoRef
@@ -57,13 +56,13 @@ main = do
   let css = $(embedFile "../app/css/styles.css")
 
       -- JSaddle currently does nothing with the appdelegate handlers. Hopefully it will in the future.
-      appDelegateConfig =
-        def { WebView._appDelegateConfig_applicationWillTerminate = finalizer
-            }
+      --appDelegateConfig =
+      --  def { WebView._appDelegateConfig_applicationWillTerminate = finalizer
+      --      }
 
-  WebView.runWithAppConfig appDelegateConfig
-    $ Main.mainWidgetWithCss css (rootWidget initState)
-  --mainWidgetWithCss css (rootWidget initState)
+  --WebView.runWithAppConfig appDelegateConfig
+  --  $ Main.mainWidgetWithCss css (rootWidget initState)
+  mainWidgetWithCss css (rootWidget initState)
 
 openDeviceSpec :: (forall s. SDL.AudioFormat s -> MV.IOVector s -> IO ()) -> SDL.OpenDeviceSpec
 openDeviceSpec callback = SDL.OpenDeviceSpec

@@ -20,6 +20,29 @@ input {
   background-color: gray;
 }
 
+.mute-control-wrapper {
+  display: inline-block;
+}
+
+.mute-btn button {
+  background: none;
+  border: none;
+  color: white;
+  display: block;
+}
+
+.solo-btn button {
+  background: none;
+  border: none;
+  color: white;
+  display: block;
+}
+
+.active button {
+  font-weight: bold;
+  color: rgb(238, 17, 100);
+}
+
 .delete-layer {
   display: inline-block;
 }

@@ -29,7 +29,7 @@ type JambdaUI t m = ( MonadHold t m
 data LayerEvent
   = NewLayer Int LayerUI
   | RemoveLayer Int
-  | ChangeLayer Int LayerUI
+  | ChangeLayer Int (LayerUI -> LayerUI)
 
 data LayerUI =
   LayerUI
@@ -39,6 +39,8 @@ data LayerUI =
     , _layerUIPitch       :: InputState Pitch -- ^ Holds the state of the pitch input
     , _layerUIVol         :: Float
     , _layerUIPan         :: Float
+    , _layerUIMuted       :: Bool
+    , _layerUISoloed      :: Bool
     }
 
 mkNewLayerUI :: T.Text -> T.Text -> SoundSource -> LayerUI
@@ -50,6 +52,8 @@ mkNewLayerUI beat offset soundSource =
     , _layerUIPitch       = InputState pitch Nothing
     , _layerUIVol         = 1.0
     , _layerUIPan         = 0.0
+    , _layerUIMuted       = False
+    , _layerUISoloed      = False
     }
     where
       pitch = case soundSource of

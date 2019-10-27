@@ -33,4 +33,4 @@ layerListWidget st newLayerEvent = mdo
 applyLayerEvent :: LayerEvent -> M.IntMap LayerUI -> M.IntMap LayerUI
 applyLayerEvent (NewLayer i l) = M.insert i l
 applyLayerEvent (RemoveLayer i) = M.delete i
-applyLayerEvent (ChangeLayer i l) = at i . _Just .~ l
+applyLayerEvent (ChangeLayer i fn) = ix i %~ fn
