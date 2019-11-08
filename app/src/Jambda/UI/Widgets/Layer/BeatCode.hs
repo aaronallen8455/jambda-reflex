@@ -18,16 +18,12 @@ import           Jambda.Data (applyLayerBeatChange, parseBeat)
 import           Jambda.Types
 import           Jambda.UI.Widgets.TextField (textFieldInput)
 
-validateBeatCode :: M.IntMap LayerUI -> V.Vector Wav -> Int -> T.Text -> Maybe (M.IntMap (NonEmpty Cell'), T.Text)
-validateBeatCode layerMap wavs layerId t = do
-  let beatCodes' = _inpValid . _layerUIBeatCode <$> layerMap
-      beatCodes'' = M.insert layerId t beatCodes'
-      parse i = parseBeat i beatCodes' wavs
-  parsedCodes <- M.traverseWithKey parse beatCodes''
-  pure (parsedCodes, t)
-
 mkBeatCodeInput :: JambdaUI t m
-                => JamState -> M.IntMap LayerUI -> Int -> LayerUI -> m (Event t LayerEvent)
+                => JamState
+                -> M.IntMap LayerUI
+                -> Int
+                -> LayerUI
+                -> m (Event t LayerEvent)
 mkBeatCodeInput st layerMap layerId layerUI = do
   beatCodeInput <- textFieldInput (Just "BeatCode")
                                   (Just "beatcode-input")
@@ -45,3 +41,15 @@ mkBeatCodeInput st layerMap layerId layerUI = do
     Left inv        -> ChangeLayer layerId ( layerUIBeatCode . inpInvalid .~ Just inv )
     Right (_, txt)  -> ChangeLayer layerId $ ( layerUIBeatCode . inpValid .~ txt )
                                            . ( layerUIBeatCode . inpInvalid .~ Nothing )
+
+validateBeatCode :: M.IntMap LayerUI
+                 -> V.Vector Wav
+                 -> Int
+                 -> T.Text
+                 -> Maybe (M.IntMap (NonEmpty Cell'), T.Text)
+validateBeatCode layerMap wavs layerId t = do
+  let beatCodes' = _inpValid . _layerUIBeatCode <$> layerMap
+      beatCodes'' = M.insert layerId t beatCodes'
+      parse i = parseBeat i beatCodes' wavs
+  parsedCodes <- M.traverseWithKey parse beatCodes''
+  pure (parsedCodes, t)

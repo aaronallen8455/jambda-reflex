@@ -19,7 +19,11 @@ import           Jambda.UI.Widgets.Layer.Offset
 import           Jambda.UI.Widgets.Layer.VolAndPan
 
 layerWidget :: JambdaUI t m
-            => JamState -> Int -> LayerUI -> M.IntMap LayerUI -> m (Event t LayerEvent)
+            => JamState
+            -> Int
+            -> LayerUI
+            -> M.IntMap LayerUI
+            -> m (Event t LayerEvent)
 layerWidget st layerId layerUI layerMap = divClass "layer-wrapper" $ do
   el "div" . text $ "Layer " <> (T.pack . show) layerId
 

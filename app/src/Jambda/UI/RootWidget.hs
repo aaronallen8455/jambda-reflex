@@ -13,8 +13,8 @@ import           Reflex.Dom
 import           Jambda.Types
 import           Jambda.UI.Widgets
 
-rootWidget :: JambdaUI t m => JamState -> m ()
-rootWidget st = el "div" $ mdo
+rootWidget :: JambdaUI t m => JamState -> [BeatFileName] -> m ()
+rootWidget st savedBeats = el "div" $ mdo
   -- quit button
   quitEvDyn <- widgetHold ( button "Quit" ) (pure never <$ quitEv)
   quitEv <- sample $ current quitEvDyn
@@ -22,18 +22,21 @@ rootWidget st = el "div" $ mdo
   performEvent_ $ liftIO ( st^.jamStFinalizer ) <$ quitEv
 
   _ <- flip widgetHold ( text "Have a nice day!" <$ quitEv ) $ mdo
-    layerIdxs <- layerListWidget st newLayerEvent'
+    layerMapDyn <- layerListWidget st newLayerEvent' loadedLayersEv'
 
-    newLayerEvent' <- divClass "control-wrapper" $ do
-      newLayerEvent <- newLayerWidget st layerIdxs
+    ( newLayerEvent', loadedLayersEv' ) <- divClass "control-wrapper" $ mdo
+      newLayerEvent <- newLayerWidget st layerMapDyn
 
       transportControlsWidget st
 
-      tempoWidget st
+      tempoWidget st loadedTempoEv
 
       volumeWidget st
 
-      pure newLayerEvent
+      ( loadedLayersEv, loadedTempoEv )
+        <- persistenceWidget st savedBeats layerMapDyn
+
+      pure ( newLayerEvent, loadedLayersEv )
 
     pure ()
 

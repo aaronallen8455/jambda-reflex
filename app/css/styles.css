@@ -87,6 +87,7 @@ input {
 
 .volume-input {
   width: 30px;
+  margin-right: 40px;
 }
 
 .tempo-input {

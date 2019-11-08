@@ -1,5 +1,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Jambda.Types.Newtypes
   ( Sample(..)
   , CellValue(..)
@@ -12,6 +13,7 @@ module Jambda.Types.Newtypes
   , volToText
   ) where
 
+import           Data.Aeson.TH
 import qualified Data.Text as T
 import           Foreign.Storable (Storable)
 import           Text.Printf
@@ -38,3 +40,6 @@ volToText (Vol x) = T.pack $ printf "%.1f" x
 newtype Sec = Sec { getSec :: Double } deriving (Show, Eq, Ord, Num)
 
 newtype Octave = Octave { getOctave :: Int } deriving (Show, Eq, Ord, Num, Random)
+
+$(deriveJSON defaultOptions ''BPM)
+$(deriveJSON defaultOptions ''Octave)

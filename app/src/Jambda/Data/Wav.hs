@@ -23,11 +23,10 @@ import           Jambda.Types
 loadWavFiles :: IO (V.Vector Wav)
 loadWavFiles = itraverse mkWav wavFiles
   where
-    mkWav i (fp, label, hh) = do
+    mkWav i (fp, label) = do
       (samples, ptr) <- loadWavFile fp
       pure Wav { _wavLabel   = label
                , _wavSamples = V.toList samples
-               , _wavHighHat = hh
                , _wavPtr = ptr
                , _wavIdx = i
                }

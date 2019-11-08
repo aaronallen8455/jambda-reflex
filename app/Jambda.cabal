@@ -23,6 +23,7 @@ executable Jambda
                , Jambda.Data.Conversions
                , Jambda.Data.Layer
                , Jambda.Data.Parsers
+               , Jambda.Data.Persistence
                , Jambda.Data.Stream
                , Jambda.Data.Wav
                , Jambda.Types
@@ -30,6 +31,7 @@ executable Jambda
                , Jambda.Types.JamState
                , Jambda.Types.Layer
                , Jambda.Types.Newtypes
+               , Jambda.Types.Persistence
                , Jambda.Types.Semaphore
                , Jambda.Types.SoundSource
                , Jambda.Types.SoundSource.Pitch
@@ -49,6 +51,7 @@ executable Jambda
                , Jambda.UI.Widgets.LayerList
                , Jambda.UI.Widgets.NewLayer
                , Jambda.UI.Widgets.NumberInput
+               , Jambda.UI.Widgets.Persistence
                , Jambda.UI.Widgets.Tempo
                , Jambda.UI.Widgets.TextField
                , Jambda.UI.Widgets.ToggleButton
@@ -57,9 +60,11 @@ executable Jambda
 
   -- other-extensions:
   build-depends:       base >=4.11 && <4.12
+                     , aeson
                      , bytestring
                      , containers
                      , data-default-class
+                     , directory
                      , file-embed
                      , jsaddle-wkwebview
                      , lens

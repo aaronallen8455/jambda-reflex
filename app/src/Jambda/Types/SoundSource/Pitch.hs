@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Jambda.Types.SoundSource.Pitch
   ( Pitch(..)
   , Note(..)
@@ -5,6 +6,7 @@ module Jambda.Types.SoundSource.Pitch
   , pitchToFreq
   ) where
 
+import           Data.Aeson.TH
 import           Data.Bifunctor
 import qualified Data.Text as T
 import           System.Random
@@ -59,3 +61,6 @@ pitchToFreq ( Pitch note octave ) = Freq $
   where
     noteIndex = fromIntegral $ fromEnum note
     oct = fromIntegral $ getOctave octave
+
+$(deriveJSON defaultOptions ''Note)
+$(deriveJSON defaultOptions ''Pitch)

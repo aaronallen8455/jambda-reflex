@@ -53,6 +53,8 @@ main = do
                            , _jamStFinalizer      = finalizer
                            }
 
+  savedBeats <- getSavedBeats
+
   let css = $(embedFile "../app/css/styles.css")
 
       -- JSaddle currently does nothing with the appdelegate handlers. Hopefully it will in the future.
@@ -62,7 +64,7 @@ main = do
 
   --WebView.runWithAppConfig appDelegateConfig
   --  $ Main.mainWidgetWithCss css (rootWidget initState)
-  mainWidgetWithCss css (rootWidget initState)
+  mainWidgetWithCss css (rootWidget initState savedBeats)
 
 openDeviceSpec :: (forall s. SDL.AudioFormat s -> MV.IOVector s -> IO ()) -> SDL.OpenDeviceSpec
 openDeviceSpec callback = SDL.OpenDeviceSpec

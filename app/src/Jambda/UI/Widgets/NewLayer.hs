@@ -8,6 +8,7 @@ module Jambda.UI.Widgets.NewLayer
 import           Control.Lens
 import           Control.Monad (void)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
+import qualified Data.IntMap as M
 import qualified Data.IntSet as S
 import           Data.IORef (modifyIORef', readIORef)
 import           System.Random (randomIO)
@@ -17,8 +18,12 @@ import           Reflex.Dom
 import           Jambda.Data
 import           Jambda.Types
 
-newLayerWidget :: JambdaUI t m => JamState -> Dynamic t S.IntSet -> m (Event t LayerEvent)
-newLayerWidget st layerIdxDyn = mdo
+newLayerWidget :: JambdaUI t m
+               => JamState
+               -> Dynamic t (M.IntMap LayerUI)
+               -> m (Event t LayerEvent)
+newLayerWidget st layerMapDyn = mdo
+  let layerIdxDyn = M.keysSet <$> layerMapDyn
   newLayerIdB <- hold 1 $ maybe 1 (succ . fst) . S.maxView
                       <$> current layerIdxDyn <@ newLayerEv
 

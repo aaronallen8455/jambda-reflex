@@ -18,24 +18,18 @@ import           Jambda.Data
 import           Jambda.Types
 import           Jambda.UI.Widgets.NumberInput (numberInput)
 
-tempoWidget :: JambdaUI t m => JamState -> m ()
-tempoWidget st = mdo
-  let initTempoWidget =
-        numberInput (Just "Tempo")
-                    (Just "tempo-input")
-                    120
-                    parseBpm
-                    bpmToText
-                    1
+tempoWidget :: JambdaUI t m => JamState -> Event t BPM -> m ()
+tempoWidget st loadedTempo = mdo
+  inputBpmDyn <- holdDyn 120 $ leftmost [ tempoTapBpmEv, loadedTempo ]
 
-  tempoDyn <- fmap join . widgetHold initTempoWidget
-                        . ffor tempoTapBpmEv $ \bpm ->
-    numberInput (Just "Tempo")
-                (Just "tempo-input")
-                bpm
-                parseBpm
-                bpmToText
-                1
+  tempoDyn <- fmap join .
+    dynWidget inputBpmDyn $ \bpm ->
+      numberInput (Just "Tempo")
+                  (Just "tempo-input")
+                  bpm
+                  parseBpm
+                  bpmToText
+                  1
 
   performEvent_ $ changeTempo st <$> leftmost [updated tempoDyn, tempoTapBpmEv]
   tempoTapEv <- button "Tap"
@@ -45,6 +39,11 @@ tempoWidget st = mdo
              <$> foldDyn buildTimeList (pure 0) timeEv
   let tempoTapBpmEv = fmapMaybe id $ updated tempoTapBpm
   pure ()
+
+dynWidget :: JambdaUI t m => Dynamic t a -> (a -> m b) -> m (Dynamic t b)
+dynWidget da mkWidget = do
+  a <- sample $ current da
+  widgetHold (mkWidget a) (mkWidget <$> updated da)
 
 changeTempo :: MonadIO m => JamState -> BPM -> m ()
 changeTempo st newTempo = liftIO . signalSemaphore ( st^.jamStSemaphore ) $ do
