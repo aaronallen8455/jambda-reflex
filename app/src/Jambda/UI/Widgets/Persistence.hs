@@ -26,6 +26,8 @@ persistenceWidget :: forall t m. JambdaUI t m
                   -> Dynamic t (IM.IntMap LayerUI)
                   -> m (Event t (IM.IntMap LayerUI), Event t BPM)
 persistenceWidget jamSt savedBeats layerMapDyn = mdo
+  saveBeatNameEv <- saveBeatWidget jamSt layerMapDyn
+
   -- Dyn of all beat file names
   savedBeatsDyn
     <- foldDyn ($) ( S.fromList savedBeats ) $
@@ -34,6 +36,20 @@ persistenceWidget jamSt savedBeats layerMapDyn = mdo
            , S.delete <$> deleteBeatNameEv
            ]
 
+  let savedBeatsMap = mkSavedBeatsMap <$> savedBeatsDyn
+
+  ( selectedBeatDyn, loadedBeatEv, loadedTempoEv )
+    <- loadBeatWidget jamSt savedBeatsMap
+
+  deleteBeatNameEv <- deleteBeatWidget selectedBeatDyn
+
+  pure ( loadedBeatEv, loadedTempoEv )
+
+saveBeatWidget :: JambdaUI t m
+               => JamState
+               -> Dynamic t (IM.IntMap LayerUI)
+               -> m (Event t BeatFileName)
+saveBeatWidget jamSt layerMapDyn = mdo
   -- Value of beat name input
   fileNameDyn <- fmap BeatFileName . _inputElement_value
                    <$> label "Beat Name" ( inputElement def )
@@ -46,8 +62,16 @@ persistenceWidget jamSt savedBeats layerMapDyn = mdo
     persistBeat jamSt <$> current fileNameDyn
                       <@> tagPromptlyDyn layerMapDyn saveBeatEv
 
-  let savedBeatsMap = mkSavedBeatsMap <$> savedBeatsDyn
+  pure saveBeatNameEv
 
+loadBeatWidget :: JambdaUI t m
+                 => JamState
+                 -> Dynamic t (M.Map (Maybe BeatFileName) T.Text)
+                 -> m ( Dynamic t (Maybe BeatFileName)
+                      , Event t (IM.IntMap LayerUI)
+                      , Event t BPM
+                      )
+loadBeatWidget jamSt savedBeatsMap = mdo
   -- Event for selection of a saved beat to load
   selectBeatDropdown <- label "Load Beat" ( dropdown Nothing savedBeatsMap def )
 
@@ -56,18 +80,27 @@ persistenceWidget jamSt savedBeats layerMapDyn = mdo
   loadTempoAndBeatEv <- performEvent . fmap liftIO $
     (recoverBeat jamSt <$> fmapMaybe id selectedBeatEv)
 
-  let canDelete = isJust <$> selectedBeatDyn
-  deleteBeatEv <- toggleButton canDelete "Delete"
-
-  let deleteBeatNameEv = fmapMaybe id
-                       $ tag ( current selectedBeatDyn ) deleteBeatEv
-  performEvent_ $ liftIO . deleteSavedBeat <$> deleteBeatNameEv
 
   let loadTempoAndBeatEv' = fmapMaybe id loadTempoAndBeatEv
       loadedBeatEv = snd <$> loadTempoAndBeatEv'
       loadedTempoEv = fst <$> loadTempoAndBeatEv'
 
-  pure (loadedBeatEv, loadedTempoEv)
+  pure (selectedBeatDyn, loadedBeatEv, loadedTempoEv)
+
+deleteBeatWidget :: JambdaUI t m
+                 => Dynamic t (Maybe BeatFileName)
+                 -> m (Event t BeatFileName)
+deleteBeatWidget selectedBeatDyn = do
+  let canDelete = isJust <$> selectedBeatDyn
+
+  deleteBeatEv <- toggleButton canDelete "Delete"
+
+  let deleteBeatNameEv = fmapMaybe id
+                       $ tag ( current selectedBeatDyn ) deleteBeatEv
+
+  performEvent_ $ liftIO . deleteSavedBeat <$> deleteBeatNameEv
+
+  pure deleteBeatNameEv
 
 mkSavedBeatsMap :: S.Set BeatFileName -> M.Map (Maybe BeatFileName) T.Text
 mkSavedBeatsMap savedBeats | S.null savedBeats = M.singleton Nothing "No saved beats"
